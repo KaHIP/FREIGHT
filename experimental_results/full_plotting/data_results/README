@@ -1,0 +1,14 @@
+## This folder contains all experimental comparisons of our algorithms against the state-of-the-art
+## Each line of the files resultsGP.txt, results_connectivity.txt, times.txt, and result_balance.txt shows the result of a specific experiment.
+
+## The files resultsGP.txt have the following columns
+index k seed hypergraph algorithm cut-net nets_in_the_hypergraph
+
+## The files results_connectivity.txt have the following columns
+index k seed hypergraph algorithm connectivity pins_in_the_hypergraph
+
+## The files times.txt have the following columns
+index k seed hypergraph algorithm streaming_partitioning_time io_time(0 if not measured)
+
+## The files result_balance.txt have the following columns
+index k seed hypergraph algorithm balancing 
