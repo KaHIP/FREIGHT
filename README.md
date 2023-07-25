@@ -1,4 +1,6 @@
 # FREIGHT: Fast stREamInG Hypergraph parTitioning
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT?ref=badge_shield)
+
 
 
 FREIGHT is a streaming algorithm for hypergraph partitioning which is based on the widely-known graph-based algorithm Fennel.
@@ -110,3 +112,6 @@ For a description of the graph format, please have a look at the [KaHiP manual](
 
 FREIGHT is free software provided under the MIT License.
 
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT?ref=badge_large)
