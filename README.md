@@ -1,5 +1,7 @@
 # FREIGHT: Fast stREamInG Hypergraph parTitioning
 
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT?ref=badge_shield)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 
 FREIGHT is a streaming algorithm for hypergraph partitioning which is based on the widely-known graph-based algorithm Fennel.
 By using an efficient data structure, we make the overall running of FREIGHT linearly dependent on the pin-count of the hypergraph and the memory consumption linearly dependent on the numbers of nets and blocks.
@@ -77,8 +79,8 @@ For partitioning graphs, the corresponding executable is named *freight_graphs*.
 To partition a hypergraph in net-list format using FREIGHT, run
 
 ```shell
-./freight_con <hypergraph filename> -k=<number of blocks> 
-./freight_cut <hypergraph filename> -k=<number of blocks> 
+./freight_con <hypergraph filename> --k=<number of blocks> 
+./freight_cut <hypergraph filename> --k=<number of blocks> 
 ```
 
 For a complete list of parameters alongside with descriptions, run:
