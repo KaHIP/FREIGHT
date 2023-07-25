@@ -97,7 +97,7 @@ For a characterization of the used hypergraph format, please see [this page](cod
 To partition a graph in METIS format using FREIGHT, run
 
 ```shell
-./freight_graphs <graph filename> -k=<number of blocks> 
+./freight_graphs <graph filename> --k=<number of blocks> 
 ```
 
 For a complete list of parameters alongside with descriptions, run:
