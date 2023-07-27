@@ -1,4 +1,6 @@
 # FREIGHT: Fast stREamInG Hypergraph parTitioning
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT?ref=badge_shield)
+
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT?ref=badge_shield)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -112,3 +114,6 @@ For a description of the graph format, please have a look at the [KaHiP manual](
 
 FREIGHT is free software provided under the MIT License.
 
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FKaHIP%2FFREIGHT?ref=badge_large)
