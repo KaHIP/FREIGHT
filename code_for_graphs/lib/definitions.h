@@ -20,7 +20,9 @@
 #include "stdio.h"
 
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #include <x86intrin.h>
+#endif
 /* #include <nmmintrin.h> */
 #define UPPER_MASK 0xffff0000 /* most significant w-r bits */
 #define LOWER_MASK 0x0000ffff /* least significant r bits */ 
