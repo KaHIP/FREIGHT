@@ -274,8 +274,8 @@ int parse_parameters(int argn, char **argv,
                 kaba_unsucc_iterations, kaba_disable_zero_weight_cycles,
                 maxT, maxIter, minipreps, mh_penalty_for_unconnected, mh_enable_kabapE,
 #elif defined MODE_FREIGHT_GRAPHS
-                k, imbalance, filename_output, suppress_output, 
-                ram_stream, 
+                k, imbalance, filename_output, suppress_output,
+                ram_stream, num_streams_passes, restream_vcycle,
 		suppress_file_output,
 
 #elif defined MODE_STREAMMULTISECTION

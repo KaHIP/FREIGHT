@@ -283,8 +283,9 @@ int parse_parameters(int argn, char **argv,
 		graph_translation_specs,
 
 #elif defined MODE_FREIGHT
-                k, imbalance, filename_output, suppress_output, 
-                ram_stream, suppress_file_output,
+                k, imbalance, filename_output, suppress_output,
+                ram_stream, num_streams_passes, restream_vcycle,
+                suppress_file_output,
 #elif defined MODE_STREAMMAP
                 k, imbalance, preconfiguration, time_limit, integrated_mapping, 
                 multisection, global_msec, qap_label_propagation, qap_blabel_propagation, qap_alabel_propagation, 
