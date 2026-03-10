@@ -51,7 +51,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 # check dependencies
-find_package(MPI REQUIRED)
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
   message(STATUS "OpenMP support detected")

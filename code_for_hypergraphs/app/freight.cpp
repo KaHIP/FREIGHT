@@ -50,17 +50,17 @@ int main(int argn, char **argv) {
         timer t, processing_t, io_t;
 	double total_edge_cut = 0;
 	double connectivity = 0;
-	int counter=0;
+	[[maybe_unused]] int counter=0;
         double global_mapping_time = 0;
-	double buffer_mapping_time = 0;
+	[[maybe_unused]] double buffer_mapping_time = 0;
 	double buffer_io_time = 0;
 	double total_time = 0;
         quality_metrics qm;
         EdgeWeight qap = 0;
-	matrix* D=NULL;
-	std::vector< NodeID > *perm_rank = NULL;
-	int full_stream_count = 0;
-	double total_nodes = 0;
+	[[maybe_unused]] matrix* D=NULL;
+	[[maybe_unused]] std::vector< NodeID > *perm_rank = NULL;
+	[[maybe_unused]] int full_stream_count = 0;
+	[[maybe_unused]] double total_nodes = 0;
 	balance_configuration bc;
 	LongNodeID pin_count=0;
 
@@ -78,7 +78,7 @@ int main(int argn, char **argv) {
                 return 0;
         }
 
-        std::streambuf* backup = std::cout.rdbuf();
+        [[maybe_unused]] std::streambuf* backup = std::cout.rdbuf();
         std::ofstream ofs;
         ofs.open("/dev/null");
         if(suppress_output) {
@@ -90,7 +90,7 @@ int main(int argn, char **argv) {
         config.LogDump(stdout);
 	config.stream_input = true;
 
-	bool already_fully_partitioned;
+	[[maybe_unused]] bool already_fully_partitioned;
 
 	vertex_partitioning* onepass_partitioner = NULL;
 	initialize_onepass_partitioner(config, onepass_partitioner);

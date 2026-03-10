@@ -33,7 +33,7 @@ void graph_io_stream::streamEvaluateHPartition_pinsl(PartitionConfig & config, c
         std::ifstream in(filename.c_str());
         if (!in) {
                 std::cerr << "Error opening " << filename << std::endl;
-                return 1;
+                return;
         }
         long nmbNodes;
         long nmbEdges;
@@ -55,9 +55,9 @@ void graph_io_stream::streamEvaluateHPartition_pinsl(PartitionConfig & config, c
         } else if (ew == 10) {
                 read_nw = true;
         }
-	NodeID target;
-        NodeWeight total_nodeweight = 0;
-        EdgeWeight total_edgeweight = 0;
+	[[maybe_unused]] NodeID target;
+        [[maybe_unused]] NodeWeight total_nodeweight = 0;
+        [[maybe_unused]] EdgeWeight total_edgeweight = 0;
 	cutNet = 0;
 	connectivity = 0;
 	qap = 0;
@@ -145,7 +145,7 @@ void graph_io_stream::streamEvaluateHPartition_netl(PartitionConfig & config, co
         std::ifstream in(filename.c_str());
         if (!in) {
                 std::cerr << "Error opening " << filename << std::endl;
-                return 1;
+                return;
         }
         long nmbNodes;
         long nmbEdges;
@@ -167,9 +167,9 @@ void graph_io_stream::streamEvaluateHPartition_netl(PartitionConfig & config, co
         } else if (ew == 10) {
                 read_nw = true;
         }
-	NodeID target;
-        NodeWeight total_nodeweight = 0;
-        EdgeWeight total_edgeweight = 0;
+	[[maybe_unused]] NodeID target;
+        [[maybe_unused]] NodeWeight total_nodeweight = 0;
+        [[maybe_unused]] EdgeWeight total_edgeweight = 0;
 	cutNet = 0;
 	connectivity = 0;
 	qap = 0;
@@ -258,15 +258,15 @@ void graph_io_stream::streamEvaluateEdgePartition_netl(PartitionConfig & config,
         std::ifstream in(filename.c_str());
         if (!in) {
                 std::cerr << "Error opening " << filename << std::endl;
-                return 1;
+                return;
         }
         long nmbNodes;
         long nmbEdges;
         int ew = 0;
 
-	NodeID target;
-        NodeWeight total_nodeweight = 0;
-        EdgeWeight total_edgeweight = 0;
+	[[maybe_unused]] NodeID target;
+        [[maybe_unused]] NodeWeight total_nodeweight = 0;
+        [[maybe_unused]] EdgeWeight total_edgeweight = 0;
 	cutNet = 0;
 	connectivity = 0;
 	qap = 0;
@@ -334,7 +334,7 @@ void graph_io_stream::streamEvaluatePartition(PartitionConfig & config, const st
         std::ifstream in(filename.c_str());
         if (!in) {
                 std::cerr << "Error opening " << filename << std::endl;
-                return 1;
+                return;
         }
         long nmbNodes;
         long nmbEdges;
@@ -356,9 +356,9 @@ void graph_io_stream::streamEvaluatePartition(PartitionConfig & config, const st
         } else if (ew == 10) {
                 read_nw = true;
         }
-	NodeID target;
-        NodeWeight total_nodeweight = 0;
-        EdgeWeight total_edgeweight = 0;
+	[[maybe_unused]] NodeID target;
+        [[maybe_unused]] NodeWeight total_nodeweight = 0;
+        [[maybe_unused]] EdgeWeight total_edgeweight = 0;
 	edgeCut = 0;
 	qap = 0;
 	std::vector< NodeID > *perm_rank = NULL;
@@ -438,7 +438,7 @@ void graph_io_stream::readhMetisHyperGraphWeighted(hypergraph & H, const std::st
         std::ifstream in(filename.c_str());
         if (!in) {
                 std::cerr << "Error opening " << filename << std::endl;
-                return 1;
+                return;
         }
         LongNodeID nmbNodes;
         LongEdgeID nmbNets;
@@ -634,7 +634,7 @@ void graph_io_stream::readGraphWeighted(graph_access & G, const std::string & fi
         std::ifstream in(filename.c_str());
         if (!in) {
                 std::cerr << "Error opening " << filename << std::endl;
-                return 1;
+                return;
         }
 
         long nmbNodes;
@@ -780,7 +780,7 @@ void graph_io_stream::readPartition(PartitionConfig & config, const std::string 
         std::ifstream in(filename.c_str());
         if (!in) {
                 std::cerr << "Error opening file" << filename << std::endl;
-                return 1;
+                return;
         }
 
         PartitionID max = 0;

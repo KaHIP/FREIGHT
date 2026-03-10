@@ -1920,7 +1920,7 @@ int parse_parameters(int argn, char **argv,
                         exit(0);
 		}
                 partition_config.stream_rec_bisection_base = stream_rec_bisection_base->ival[0];
-		if (partition_config.stream_rec_bisection_base < 2 || partition_config.stream_rec_bisection_base > k) {
+		if (partition_config.stream_rec_bisection_base < 2 || partition_config.stream_rec_bisection_base > partition_config.k) {
                         std::cout << "--stream_rec_bisection_base should be an integer between 2 and k." << std::endl;
                         exit(0);
 		}

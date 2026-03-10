@@ -44,7 +44,8 @@ class vertex_partitioning {
 		void remove_nodeweight_block(floating_block & real_block, NodeWeight n_weight);
 		PartitionID assign_node_block(floating_block & real_block, LongNodeID curr_node_id, NodeWeight curr_node_weight, int my_thread);
 		PartitionID force_decision_block(floating_block & real_block, LongNodeID curr_node_id, NodeWeight curr_node_weight, int my_thread);
-		floating_block* get_block_address(PartitionID block_id) const;
+		floating_block* get_block_address(PartitionID block_id);
+		const floating_block* get_block_address(PartitionID block_id) const;
 		void enable_self_sorting_array();
 		void set_sampling_threashold(float sampling_threashold);
                 
@@ -396,8 +397,13 @@ inline void vertex_partitioning::set_original_problem(vertex_partitioning* origi
 	this->original_problem = original_problem;
 }
 
-inline floating_block* vertex_partitioning::get_block_address(PartitionID block_id) const {
+inline floating_block* vertex_partitioning::get_block_address(PartitionID block_id) {
 	floating_block* block_pointer = &(blocks[block_id]);
+	return block_pointer;
+}
+
+inline const floating_block* vertex_partitioning::get_block_address(PartitionID block_id) const {
+	const floating_block* block_pointer = &(blocks[block_id]);
 	return block_pointer;
 }
 

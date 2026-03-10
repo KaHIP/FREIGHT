@@ -129,7 +129,7 @@ inline void graph_io_stream::readNodeOnePass_pinsl (PartitionConfig & config, Lo
 	auto& read_ew = config.read_ew;
 	auto& read_nw = config.read_nw;
 	LongNodeID pin;
-	NodeWeight weight;
+	[[maybe_unused]] NodeWeight weight;
 	/* LongNodeID nmbNodes = 1; */
 
 	LongNodeID cursor = (config.ram_stream) ? curr_node : 0;
@@ -216,7 +216,7 @@ inline void graph_io_stream::readNodeOnePass_netl (PartitionConfig & config, Lon
 	/* NodeWeight total_nodeweight = 0; */
 	auto& read_ew = config.read_ew;
 	auto& read_nw = config.read_nw;
-	NodeWeight weight;
+	[[maybe_unused]] NodeWeight weight;
 	LongEdgeID net;
 	/* LongNodeID nmbNodes = 1; */
 
@@ -247,7 +247,7 @@ inline void graph_io_stream::readNodeOnePass_netl (PartitionConfig & config, Lon
 	float scaling_factor = 1; 
 	if(config.sample_edges) {
 		EdgeID n_sampled_edges = (config.sampling_threashold*config.stream_sampling < config.edges) ? config.stream_sampling : config.edges;
-		register bool sampling_active = n_sampled_edges < config.edges;
+		bool sampling_active = n_sampled_edges < config.edges;
 		config.step_sampled = sampling_active;
 		scaling_factor = config.edges / (float) n_sampled_edges; // Multiply weight by proportion stored in edge_weight
 		for (PartitionID i=0; i<n_sampled_edges; i++) {

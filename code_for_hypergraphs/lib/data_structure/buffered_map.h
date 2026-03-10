@@ -102,14 +102,14 @@ class minimal_min_heap {
 				j = left * 2;                                               
 			}                                                                   
 		}
-		void build() const {
+		void build() {
 			LongNodeID left = n / 2 + 1;
 			while (left > 1) {
 				left--;
 				this->redo(left, this->n);
 			}
 		}
-		U& get_min() {
+		U& get_min() const {
 			return (*this->fp)[0];
 		}
 		U& del_min() {

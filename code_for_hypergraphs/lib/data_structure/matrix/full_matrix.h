@@ -94,7 +94,7 @@ private:
 
         std::vector<int> m_internal_matrix;
         unsigned int m_dim_x, m_dim_y;
-        int m_lazy_init_val;
+        [[maybe_unused]] int m_lazy_init_val;
         // std::vector< int > interval_sizes;
 };
 

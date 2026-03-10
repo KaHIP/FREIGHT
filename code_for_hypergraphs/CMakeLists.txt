@@ -47,7 +47,6 @@ if(COMPILER_SUPPORTS_FPERMISSIVE)
 endif()
 
 # check dependencies
-find_package(MPI REQUIRED)
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
   message(STATUS "OpenMP support detected")
