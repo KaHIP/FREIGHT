@@ -1,99 +1,100 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250">
   <defs>
     <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
     </filter>
-    <linearGradient id="stream" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#666;stop-opacity:0.3"/>
-      <stop offset="40%" style="stop-color:#e74c3c;stop-opacity:0.8"/>
-      <stop offset="100%" style="stop-color:#e74c3c;stop-opacity:1"/>
-    </linearGradient>
-    <linearGradient id="stream2" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#666;stop-opacity:0.3"/>
-      <stop offset="40%" style="stop-color:#3498db;stop-opacity:0.8"/>
-      <stop offset="100%" style="stop-color:#3498db;stop-opacity:1"/>
-    </linearGradient>
-    <linearGradient id="stream3" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#666;stop-opacity:0.3"/>
-      <stop offset="40%" style="stop-color:#f1c40f;stop-opacity:0.8"/>
-      <stop offset="100%" style="stop-color:#f1c40f;stop-opacity:1"/>
-    </linearGradient>
   </defs>
 
   <!-- Background -->
   <rect width="900" height="250" rx="12" fill="#1a1d23"/>
 
-  <!-- Hyperedges (nets) as colored regions behind nodes -->
-  <!-- Net 1 (red region) -->
-  <path d="M 620,55 Q 660,40 700,55 Q 720,75 700,95 Q 660,110 620,95 Q 600,75 620,55" fill="#e74c3c" opacity="0.15" stroke="#e74c3c" stroke-opacity="0.3" stroke-width="1"/>
-  <!-- Net 2 (blue region) -->
-  <path d="M 680,95 Q 730,80 770,100 Q 790,130 770,155 Q 730,170 680,155 Q 660,130 680,95" fill="#3498db" opacity="0.15" stroke="#3498db" stroke-opacity="0.3" stroke-width="1"/>
-  <!-- Net 3 (yellow region) -->
-  <path d="M 610,130 Q 650,115 690,130 Q 710,155 690,180 Q 650,195 610,180 Q 590,155 610,130" fill="#f1c40f" opacity="0.15" stroke="#f1c40f" stroke-opacity="0.3" stroke-width="1"/>
-
-  <!-- Streaming arrows (left side - nodes flowing in) -->
-  <circle cx="60" cy="75" r="5" fill="#888" opacity="0.3"/>
-  <circle cx="90" cy="60" r="5" fill="#999" opacity="0.4"/>
-  <circle cx="80" cy="90" r="5" fill="#888" opacity="0.35"/>
-  <circle cx="50" cy="155" r="5" fill="#999" opacity="0.3"/>
-  <circle cx="75" cy="140" r="5" fill="#888" opacity="0.35"/>
-  <circle cx="65" cy="170" r="5" fill="#999" opacity="0.4"/>
-
-  <!-- Stream flow lines -->
-  <path d="M 100,75 Q 200,70 300,65" stroke="url(#stream)" stroke-width="1.5" fill="none" stroke-dasharray="4,4" opacity="0.6"/>
-  <path d="M 100,90 Q 200,100 300,110" stroke="url(#stream2)" stroke-width="1.5" fill="none" stroke-dasharray="4,4" opacity="0.6"/>
-  <path d="M 100,155 Q 200,160 300,165" stroke="url(#stream3)" stroke-width="1.5" fill="none" stroke-dasharray="4,4" opacity="0.6"/>
-
-  <!-- Partition separator (dashed vertical line) -->
-  <line x1="570" y1="35" x2="570" y2="215" stroke="#555" stroke-width="1" stroke-dasharray="6,4" opacity="0.5"/>
-
-  <!-- Block 1 (red) - partitioned nodes -->
-  <circle cx="620" cy="65" r="8" fill="#e74c3c" filter="url(#glow)" opacity="0.9"/>
-  <circle cx="660" cy="50" r="8" fill="#e74c3c" filter="url(#glow)" opacity="0.9"/>
-  <circle cx="700" cy="70" r="8" fill="#e74c3c" filter="url(#glow)" opacity="0.9"/>
-
-  <!-- Block 2 (blue) - partitioned nodes -->
-  <circle cx="700" cy="120" r="8" fill="#3498db" filter="url(#glow)" opacity="0.9"/>
-  <circle cx="740" cy="105" r="8" fill="#3498db" filter="url(#glow)" opacity="0.9"/>
-  <circle cx="770" cy="140" r="8" fill="#3498db" filter="url(#glow)" opacity="0.9"/>
-
-  <!-- Block 3 (yellow) - partitioned nodes -->
-  <circle cx="630" cy="155" r="8" fill="#f1c40f" filter="url(#glow)" opacity="0.9"/>
-  <circle cx="670" cy="170" r="8" fill="#f1c40f" filter="url(#glow)" opacity="0.9"/>
-  <circle cx="650" cy="140" r="8" fill="#f1c40f" filter="url(#glow)" opacity="0.9"/>
-
-  <!-- Edges within blocks -->
-  <line x1="620" y1="65" x2="660" y2="50" stroke="#e74c3c" stroke-width="1" opacity="0.5"/>
-  <line x1="660" y1="50" x2="700" y2="70" stroke="#e74c3c" stroke-width="1" opacity="0.5"/>
-  <line x1="700" y1="120" x2="740" y2="105" stroke="#3498db" stroke-width="1" opacity="0.5"/>
-  <line x1="740" y1="105" x2="770" y2="140" stroke="#3498db" stroke-width="1" opacity="0.5"/>
-  <line x1="630" y1="155" x2="670" y2="170" stroke="#f1c40f" stroke-width="1" opacity="0.5"/>
-  <line x1="650" y1="140" x2="670" y2="170" stroke="#f1c40f" stroke-width="1" opacity="0.5"/>
-
-  <!-- Cut hyperedge crossing partition -->
-  <line x1="700" y1="70" x2="700" y2="120" stroke="#888" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
-
-  <!-- Block labels -->
-  <text x="785" y="72" font-family="monospace" font-size="10" fill="#e74c3c" opacity="0.7">B1</text>
-  <text x="785" y="142" font-family="monospace" font-size="10" fill="#3498db" opacity="0.7">B2</text>
-  <text x="785" y="172" font-family="monospace" font-size="10" fill="#f1c40f" opacity="0.7">B3</text>
-
-  <!-- Arrow indicating streaming direction -->
-  <text x="130" y="125" font-family="monospace" font-size="18" fill="#888" opacity="0.4">&gt;&gt;&gt;</text>
-
-  <!-- Title -->
-  <text x="250" y="105" font-family="'Segoe UI', Arial, sans-serif" font-size="52" font-weight="bold" fill="#ffffff" text-anchor="middle">FREIGHT</text>
-
-  <!-- Subtitle -->
-  <text x="250" y="135" font-family="'Segoe UI', Arial, sans-serif" font-size="14" fill="#aaaaaa" text-anchor="middle">Fast Streaming Hypergraph Partitioning</text>
+  <!-- ===== TITLE ===== -->
+  <text x="195" y="88" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="52" font-weight="bold" fill="#ffffff" text-anchor="middle">FREIGHT</text>
+  <text x="195" y="115" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="13" fill="#aaaaaa" text-anchor="middle">Fast Streaming Hypergraph Partitioning</text>
 
   <!-- Award badge -->
-  <rect x="175" y="150" width="150" height="22" rx="11" fill="#f1c40f" opacity="0.15" stroke="#f1c40f" stroke-width="1" stroke-opacity="0.4"/>
-  <text x="250" y="165" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#f1c40f" text-anchor="middle">SEA 2023 Best Paper</text>
+  <rect x="127" y="133" width="136" height="22" rx="11"
+        fill="#f1c40f" opacity="0.12" stroke="#f1c40f" stroke-width="0.8" stroke-opacity="0.35"/>
+  <text x="195" y="148" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="10.5" fill="#f1c40f" text-anchor="middle" opacity="0.9">SEA 2023 Best Paper</text>
 
-  <!-- Legend -->
-  <text x="595" y="210" font-family="monospace" font-size="9" fill="#888">streaming in</text>
-  <text x="680" y="210" font-family="monospace" font-size="9" fill="#888">partitioned</text>
+  <!-- ===== STREAMING INPUT ===== -->
+
+  <!-- Stream track line -->
+  <line x1="415" y1="125" x2="545" y2="125" stroke="#555" stroke-width="0.8" opacity="0.25"/>
+
+  <!-- Direction arrow -->
+  <polygon points="400,120 410,125 400,130" fill="#666" opacity="0.35"/>
+
+  <!-- Streaming nodes (growing size and opacity as they approach) -->
+  <circle cx="418" cy="125" r="3" fill="#666" opacity="0.15"/>
+  <circle cx="436" cy="125" r="3.5" fill="#777" opacity="0.25"/>
+  <circle cx="454" cy="125" r="4" fill="#888" opacity="0.35"/>
+  <circle cx="472" cy="125" r="4.5" fill="#999" opacity="0.45"/>
+  <circle cx="490" cy="125" r="5" fill="#aaa" opacity="0.55"/>
+  <circle cx="508" cy="125" r="5.5" fill="#bbb" opacity="0.68"/>
+  <circle cx="526" cy="125" r="6" fill="#ddd" opacity="0.82"/>
+
+  <!-- ===== BRANCHING FLOWS (stream splits into partitions) ===== -->
+
+  <!-- To Block 1 (top, red) -->
+  <path d="M 540,125 C 560,125 595,58 625,58"
+        stroke="#e74c3c" stroke-width="1.2" fill="none" stroke-dasharray="4,3" opacity="0.35"/>
+  <!-- To Block 2 (middle, blue) -->
+  <path d="M 540,125 C 560,125 600,125 625,125"
+        stroke="#3498db" stroke-width="1.2" fill="none" stroke-dasharray="4,3" opacity="0.35"/>
+  <!-- To Block 3 (bottom, amber) -->
+  <path d="M 540,125 C 560,125 595,192 625,192"
+        stroke="#f1c40f" stroke-width="1.2" fill="none" stroke-dasharray="4,3" opacity="0.35"/>
+
+  <!-- In-transit dots along branches -->
+  <circle cx="580" cy="92" r="3.5" fill="#e74c3c" opacity="0.3"/>
+  <circle cx="580" cy="125" r="3.5" fill="#3498db" opacity="0.3"/>
+  <circle cx="580" cy="158" r="3.5" fill="#f1c40f" opacity="0.3"/>
+
+  <!-- ===== PARTITION BLOCKS ===== -->
+
+  <!-- Block 1 (red) -->
+  <rect x="615" y="33" width="215" height="50" rx="6"
+        fill="#e74c3c" opacity="0.06" stroke="#e74c3c" stroke-width="0.8" stroke-opacity="0.18"/>
+  <!-- Hyperedge curve connecting nodes -->
+  <path d="M 645,58 Q 680,44 715,52 Q 750,44 785,58"
+        stroke="#e74c3c" stroke-width="1.8" fill="none" opacity="0.3"/>
+  <!-- Nodes -->
+  <circle cx="645" cy="58" r="6.5" fill="#e74c3c" filter="url(#glow)" opacity="0.85"/>
+  <circle cx="715" cy="52" r="6.5" fill="#e74c3c" filter="url(#glow)" opacity="0.85"/>
+  <circle cx="785" cy="58" r="6.5" fill="#e74c3c" filter="url(#glow)" opacity="0.85"/>
+
+  <!-- Block 2 (blue) -->
+  <rect x="615" y="100" width="215" height="50" rx="6"
+        fill="#3498db" opacity="0.06" stroke="#3498db" stroke-width="0.8" stroke-opacity="0.18"/>
+  <!-- Hyperedge curve -->
+  <path d="M 645,125 Q 680,112 715,120 Q 750,112 785,125"
+        stroke="#3498db" stroke-width="1.8" fill="none" opacity="0.3"/>
+  <!-- Nodes -->
+  <circle cx="645" cy="125" r="6.5" fill="#3498db" filter="url(#glow)" opacity="0.85"/>
+  <circle cx="715" cy="120" r="6.5" fill="#3498db" filter="url(#glow)" opacity="0.85"/>
+  <circle cx="785" cy="125" r="6.5" fill="#3498db" filter="url(#glow)" opacity="0.85"/>
+
+  <!-- Block 3 (amber) -->
+  <rect x="615" y="167" width="215" height="50" rx="6"
+        fill="#f1c40f" opacity="0.06" stroke="#f1c40f" stroke-width="0.8" stroke-opacity="0.18"/>
+  <!-- Hyperedge curve -->
+  <path d="M 645,192 Q 680,178 715,185 Q 750,178 785,192"
+        stroke="#f1c40f" stroke-width="1.8" fill="none" opacity="0.3"/>
+  <!-- Nodes -->
+  <circle cx="645" cy="192" r="6.5" fill="#f1c40f" filter="url(#glow)" opacity="0.85"/>
+  <circle cx="715" cy="185" r="6.5" fill="#f1c40f" filter="url(#glow)" opacity="0.85"/>
+  <circle cx="785" cy="192" r="6.5" fill="#f1c40f" filter="url(#glow)" opacity="0.85"/>
+
+  <!-- Cut hyperedge crossing partition boundary (dashed) -->
+  <line x1="715" y1="52" x2="715" y2="120"
+        stroke="#888" stroke-width="1" stroke-dasharray="3,3" opacity="0.25"/>
 
 </svg>
