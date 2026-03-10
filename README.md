@@ -70,7 +70,8 @@ FREIGHT builds three partitioners and a format converter:
 | `freight_con` | Net-list | Connectivity | Hypergraph partitioning optimizing connectivity |
 | `freight_cut` | Net-list | Cut-net | Hypergraph partitioning optimizing cut-net |
 | `freight_graphs` | METIS | Edge-cut | Graph partitioning (Fennel-based streaming) |
-| `hmetis_to_freight` | hMETIS | -- | Convert hMETIS format to FREIGHT net-list format |
+| `hmetis_to_freight` | hMETIS | -- | Convert hMETIS to FREIGHT net-list (in-memory) |
+| `hmetis_to_freight_stream` | hMETIS | -- | Convert hMETIS to FREIGHT net-list (two-pass, low memory) |
 
 ---
 
@@ -151,17 +152,20 @@ The standard **hMETIS format** is net-centric: the header is `m n [f]` (nets fir
 2 3        ← node 4 belongs to nets 2, 3
 ```
 
-Both files describe the same hypergraph, but the net-list format is node-centric, enabling streaming. FREIGHT includes a converter:
+Both files describe the same hypergraph, but the net-list format is node-centric, enabling streaming. FREIGHT includes two converters:
 
 ```bash
-# Convert hMETIS format to FREIGHT net-list format
+# In-memory converter (loads full hypergraph, simple and fast)
 hmetis_to_freight input.hgr output.netl
+
+# Streaming converter (two-pass, O(n+m) memory instead of O(pins))
+hmetis_to_freight_stream input.hgr output.netl
 
 # Then partition
 freight_cut output.netl --k=8
 ```
 
-The converter handles all weight combinations (unweighted, node weights, net weights, or both). Example files in both formats are in [code_for_hypergraphs/examples/](code_for_hypergraphs/examples/).
+Both converters produce identical output and handle all weight combinations (unweighted, node weights, net weights, or both). Use `hmetis_to_freight_stream` for hypergraphs too large to fit in memory. Example files in both formats are in [code_for_hypergraphs/examples/](code_for_hypergraphs/examples/).
 
 ### Graph format (METIS)
 
