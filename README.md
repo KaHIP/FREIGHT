@@ -132,7 +132,26 @@ For more details, see [code_for_hypergraphs/examples/](code_for_hypergraphs/exam
 
 ### Converting from hMETIS
 
-The standard **hMETIS format** is net-centric: the header is `m n [f]` (nets first, nodes second) and each line lists the pins (nodes) of a hyperedge. FREIGHT includes a converter:
+The standard **hMETIS format** is net-centric: the header is `m n [f]` (nets first, nodes second) and each line lists the pins (nodes) of a hyperedge.
+
+**The same hypergraph in hMETIS format** (3 nets, 4 nodes):
+```
+3 4
+1 2        ← net 1 contains nodes 1, 2
+1 3        ← net 2 contains nodes 1, 3
+2 4        ← net 3 contains nodes 2, 4
+```
+
+**Converted to FREIGHT net-list format** (4 nodes, 3 nets):
+```
+4 3
+1 2        ← node 1 belongs to nets 1, 2
+1 3        ← node 2 belongs to nets 1, 3
+2          ← node 3 belongs to net 2
+2 3        ← node 4 belongs to nets 2, 3
+```
+
+Both files describe the same hypergraph, but the net-list format is node-centric, enabling streaming. FREIGHT includes a converter:
 
 ```bash
 # Convert hMETIS format to FREIGHT net-list format
@@ -142,7 +161,7 @@ hmetis_to_freight input.hgr output.netl
 freight_cut output.netl --k=8
 ```
 
-The converter handles all weight combinations (unweighted, node weights, net weights, or both).
+The converter handles all weight combinations (unweighted, node weights, net weights, or both). Example files in both formats are in [code_for_hypergraphs/examples/](code_for_hypergraphs/examples/).
 
 ### Graph format (METIS)
 
