@@ -31,7 +31,13 @@ FREIGHT v1.0
 
 ## Quick Start
 
-### Build
+### Install via Homebrew
+
+```bash
+brew install KaHIP/kahip/freight
+```
+
+### Or build from source
 
 ```bash
 git clone https://github.com/KaHIP/FREIGHT.git && cd FREIGHT
@@ -42,14 +48,16 @@ git clone https://github.com/KaHIP/FREIGHT.git && cd FREIGHT
 
 ```bash
 # Partition a hypergraph into 8 blocks (connectivity metric)
-./deploy/freight_con myhypergraph.hgr --k=8
+freight_con myhypergraph.hgr --k=8
 
 # Partition a hypergraph into 8 blocks (cut-net metric)
-./deploy/freight_cut myhypergraph.hgr --k=8
+freight_cut myhypergraph.hgr --k=8
 
 # Partition a graph (METIS format) into 8 blocks
-./deploy/freight_graphs mygraph.graph --k=8
+freight_graphs mygraph.graph --k=8
 ```
+
+When building from source, binaries are in `./deploy/` (use `./deploy/freight_con` etc.).
 
 ---
 
