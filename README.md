@@ -83,12 +83,15 @@ FREIGHT builds three executables:
 
 | Option | Description | Default |
 |:-------|:-----------|:--------|
-| `--k=<int>` | Number of blocks | *required* |
-| `--imbalance=<double>` | Allowed imbalance (e.g. 0.03 = 3%) | `0.03` |
-| `--num_streams_passes=<int>` | Number of streaming passes (restreaming) | `1` |
+| `--k=<int>` | Number of blocks to partition into | *required* |
+| `--imbalance=<double>` | Allowed imbalance (e.g. 3 = 3%) | `3` |
+| `--num_streams_passes=<int>` | Number of streaming passes (restreaming improves quality) | `1` |
 | `--restream_vcycle` | Keep recursive bisections across restream passes | disabled |
-| `--seed=<int>` | Random seed | `0` |
+| `--seed=<int>` | Random seed for the PRNG | `0` |
 | `--ram_stream` | Stream from RAM instead of disk | disabled |
+| `--output_filename=<string>` | Output file for the partition | `tmppartition<k>` |
+| `--suppress_output` | Suppress console output | disabled |
+| `--suppress_file_output` | Suppress writing partition to file | disabled |
 | `--help` | Print all available options | |
 
 For a full list of parameters, run any executable with `--help`.
