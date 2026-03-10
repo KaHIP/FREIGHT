@@ -63,13 +63,14 @@ When building from source, binaries are in `./deploy/` (use `./deploy/freight_co
 
 ## Executables
 
-FREIGHT builds three executables:
+FREIGHT builds three partitioners and a format converter:
 
 | Binary | Input format | Metric | Description |
 |:-------|:------------|:-------|:------------|
 | `freight_con` | Net-list | Connectivity | Hypergraph partitioning optimizing connectivity |
 | `freight_cut` | Net-list | Cut-net | Hypergraph partitioning optimizing cut-net |
 | `freight_graphs` | METIS | Edge-cut | Graph partitioning (Fennel-based streaming) |
+| `hmetis_to_freight` | hMETIS | -- | Convert hMETIS format to FREIGHT net-list format |
 
 ---
 
@@ -102,7 +103,9 @@ For a full list of parameters, run any executable with `--help`.
 
 ### Hypergraph format (net-list)
 
-A plain text file describing a hypergraph with `n` nodes and `m` nets (hyperedges).
+FREIGHT uses a **node-centric net-list format** for hypergraphs. Each line represents one node and lists which nets (hyperedges) it belongs to. This enables streaming: nodes are processed one at a time as lines are read, without loading the full hypergraph into memory.
+
+> **Note:** This is different from the standard hMETIS format, which is net-centric (one line per hyperedge). Use `hmetis_to_freight` to convert, see [Converting from hMETIS](#converting-from-hmetis) below.
 
 **Header line:**
 ```
@@ -112,7 +115,7 @@ n m [f]
 - `f` = format flag (optional): `0` = unweighted, `1` = net weights, `10` = node weights, `11` = both
 
 **Node lines (one per node):**
-Each of the following `n` lines lists the nets that the node belongs to (**1-indexed**), optionally preceded by the node weight.
+Each of the following `n` lines lists the nets that the node belongs to (**1-indexed**). With format flag `1` or `11`, each net ID is followed by its weight. With flag `10` or `11`, each line starts with the node weight.
 
 **Example** (4 nodes, 3 nets, unweighted):
 ```
@@ -123,7 +126,23 @@ Each of the following `n` lines lists the nets that the node belongs to (**1-ind
 2 3
 ```
 
+Node 1 belongs to nets 1 and 2, node 2 belongs to nets 1 and 3, node 3 belongs to net 2, node 4 belongs to nets 2 and 3.
+
 For more details, see [code_for_hypergraphs/examples/](code_for_hypergraphs/examples/).
+
+### Converting from hMETIS
+
+The standard **hMETIS format** is net-centric: the header is `m n [f]` (nets first, nodes second) and each line lists the pins (nodes) of a hyperedge. FREIGHT includes a converter:
+
+```bash
+# Convert hMETIS format to FREIGHT net-list format
+hmetis_to_freight input.hgr output.netl
+
+# Then partition
+freight_cut output.netl --k=8
+```
+
+The converter handles all weight combinations (unweighted, node weights, net weights, or both).
 
 ### Graph format (METIS)
 

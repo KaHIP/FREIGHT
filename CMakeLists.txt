@@ -135,3 +135,7 @@ target_include_directories(freight_graphs PRIVATE ${GR_INCLUDES})
 target_compile_definitions(freight_graphs PRIVATE "-DMODE_FREIGHT_GRAPHS")
 target_link_libraries(freight_graphs ${OpenMP_CXX_LIBRARIES})
 install(TARGETS freight_graphs DESTINATION bin)
+
+# -------------------- Conversion tool --------------------
+add_executable(hmetis_to_freight tools/hmetis_to_freight.cpp)
+install(TARGETS hmetis_to_freight DESTINATION bin)
