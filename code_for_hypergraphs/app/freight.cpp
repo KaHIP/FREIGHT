@@ -78,6 +78,15 @@ int main(int argn, char **argv) {
                 return 0;
         }
 
+	// Check for hMETIS format (common mistake)
+	if (graph_filename.size() >= 4 && graph_filename.substr(graph_filename.size() - 4) == ".hgr") {
+		std::cerr << "Error: " << graph_filename << " appears to be in hMETIS format." << std::endl;
+		std::cerr << "FREIGHT requires the net-list format. Convert first:" << std::endl;
+		std::cerr << "  hmetis_to_freight " << graph_filename << " output.netl" << std::endl;
+		std::cerr << "  hmetis_to_freight_stream " << graph_filename << " output.netl  (low memory)" << std::endl;
+		return 1;
+	}
+
         [[maybe_unused]] std::streambuf* backup = std::cout.rdbuf();
         std::ofstream ofs;
         ofs.open("/dev/null");
