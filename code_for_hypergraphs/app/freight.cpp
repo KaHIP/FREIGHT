@@ -253,9 +253,7 @@ int main(int argn, char **argv) {
 	std::cout << "pin count: \t"	<< pin_count << std::endl;
 	std::cout << "connectivity    " << connectivity << std::endl;
 	std::cout << "cut\t\t"		<< total_edge_cut << std::endl;
-	std::cout << "finalobjective  " << total_edge_cut << std::endl;
 	std::cout << "balance \t"	<< qm.balance_full_stream(*config.stream_blocks_weight) << std::endl;
-	std::cout << "quadratic assignment objective J(C,D,Pi') = " << qap  << std::endl;
 
 	// write the partition to the disc 
 	std::stringstream filename;

@@ -179,7 +179,6 @@ int main(int argn, char **argv) {
 		}
 		graph_io_stream::streamEvaluatePartition(config, graph_filename, total_edge_cut, qap);
 		std::cout << "cut\t\t" << total_edge_cut << std::endl;
-		std::cout << "finalobjective  " << total_edge_cut << std::endl;
 		std::cout << "balance \t" << qm.balance_full_stream(*config.stream_blocks_weight) << std::endl;
 	}
 
