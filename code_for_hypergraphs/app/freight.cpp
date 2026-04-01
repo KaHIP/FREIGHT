@@ -200,9 +200,10 @@ int main(int argn, char **argv) {
 
 		// Evaluate this pass and track best partition
 		if (passes > 1) {
-			double pass_cut = 0, pass_con = 0;
-			EdgeWeight pass_qap = 0;
-			LongNodeID pass_pins = 0;
+			double pass_cut = 0;
+			[[maybe_unused]] double pass_con = 0;
+			[[maybe_unused]] EdgeWeight pass_qap = 0;
+			[[maybe_unused]] LongNodeID pass_pins = 0;
 			// Save stream_edges_assign before evaluation (evaluation modifies it)
 #if defined MODE_NETLIST
 			std::vector<PartitionID> saved_edges_assign(*config.stream_edges_assign);
