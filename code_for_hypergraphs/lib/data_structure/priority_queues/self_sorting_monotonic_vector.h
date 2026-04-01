@@ -44,6 +44,7 @@ class self_sorting_monotonic_vector {
                 ~self_sorting_monotonic_vector() {}
                 void initialize(K n_elements, V initial_value);
 		void increment(K key);
+		void decrement(K key);
 		K operator[](K position) const;
 		K size() const;
 		// For Later: include input iterator
@@ -86,6 +87,7 @@ self_sorting_monotonic_vector<K,V>::self_sorting_monotonic_vector(K n_elements, 
 template <typename K, typename V>
 inline void self_sorting_monotonic_vector<K,V>::initialize(K n_elements, V initial_value) {
 	this->n_elements = n_elements;
+	this->bucket_list.clear();
 	BUCKET<K,V> my_bucket = {this->n_elements, initial_value, this->n_elements - 1};
         this->bucket_list.push_front(my_bucket);
         this->ordered_list.resize(this->n_elements);
@@ -105,6 +107,34 @@ inline void self_sorting_monotonic_vector<K,V>::increment(K key) {
 		assign_to_next_bucket(key);
 	} else {
 		assign_to_new_bucket(key, new_value);
+	}
+}
+
+template <typename K, typename V>
+inline void self_sorting_monotonic_vector<K,V>::decrement(K key) {
+	K my_pos = this->pos[key];
+	auto buck = this->ordered_list[my_pos].buck;
+	V new_value = buck->value - 1;
+	// Remove from bucket by swapping with leftmost element
+	K left_pos = buck->pos_begin - buck->size + 1;
+	K tmp_key = this->ordered_list[left_pos].key;
+	std::swap(this->ordered_list[my_pos], this->ordered_list[left_pos]);
+	std::swap(this->pos[key], this->pos[tmp_key]);
+	// Shrink bucket from the left (size--, leftmost moves right; pos_begin stays)
+	buck->size--;
+	if (buck->size == 0) this->bucket_list.erase(buck);
+	// Element is now at left_pos, just before the bucket's new left boundary
+	if (left_pos > 0 && this->ordered_list[left_pos - 1].buck->value == new_value) {
+		// Extend previous bucket's right boundary to include this element
+		auto prev_buck = this->ordered_list[left_pos - 1].buck;
+		this->ordered_list[left_pos].buck = prev_buck;
+		prev_buck->pos_begin++;
+		prev_buck->size++;
+	} else {
+		// Create new single-element bucket
+		BUCKET<K,V> my_buck = {1, new_value, left_pos};
+		this->bucket_list.push_front(my_buck);
+		this->ordered_list[left_pos].buck = this->bucket_list.begin();
 	}
 }
 

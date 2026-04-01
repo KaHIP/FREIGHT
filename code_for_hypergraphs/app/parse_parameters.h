@@ -2022,10 +2022,6 @@ int parse_parameters(int argn, char **argv,
 	}
 
 	if (use_self_sorting_array->count > 0) {
-		if (num_streams_passes->count > 0) {
-			std::cout << "--use_self_sorting_array cannot be combined with --num_streams_passes." << std::endl;
-			exit(0);
-		}
 		partition_config.use_self_sorting_array = true;
 		if(partition_config.stream_sampling_type == SAMPLING_INACTIVE) {
 			partition_config.stream_sampling_type = SAMPLING_INACTIVE_LINEAR_COMPLEXITY;

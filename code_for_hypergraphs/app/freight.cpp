@@ -95,6 +95,11 @@ int main(int argn, char **argv) {
 	vertex_partitioning* onepass_partitioner = NULL;
 	initialize_onepass_partitioner(config, onepass_partitioner);
 
+	// Best partition tracking for restreaming
+	std::vector<PartitionID> best_nodes_assign;
+	std::vector<NodeWeight> best_blocks_weight;
+	double best_objective = std::numeric_limits<double>::max();
+
 	int &passes = config.num_streams_passes;
 	for (config.restream_number=0; config.restream_number<passes; config.restream_number++) {
 
@@ -102,7 +107,10 @@ int main(int argn, char **argv) {
 		graph_io_stream::readFirstLineStream(config, graph_filename, total_edge_cut, qap);
 		graph_io_stream::loadRemainingLinesToBinary(config, input);
 		buffer_io_time += io_t.elapsed();
-		onepass_partitioner->instantiate_blocks(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, config.imbalance); 		
+		onepass_partitioner->instantiate_blocks(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, config.imbalance);
+		if (config.restream_number > 0 && config.use_self_sorting_array) {
+			onepass_partitioner->reset_sorted_blocks();
+		}
 		if (config.stream_rec_bisection) {
 			onepass_partitioner->create_problem_tree(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, 
 					config.enable_mapping, config.stream_rec_biss_orig_alpha, config.non_hashified_layers);
@@ -137,8 +145,19 @@ int main(int argn, char **argv) {
 				graph_io_stream::loadBufferLinesToBinary(config, input, 1);
 			}
 			buffer_io_time += io_t.elapsed();
-			// ***************************** perform partitioning ***************************************       
+			// ***************************** perform partitioning ***************************************
 			t.restart();
+			// Restreaming: remove vertex from its old block before re-evaluating
+			if (config.restream_number > 0) {
+				PartitionID old_block = (*config.stream_nodes_assign)[curr_node];
+				if (old_block != INVALID_PARTITION) {
+					(*config.stream_blocks_weight)[old_block] -= 1;
+					onepass_partitioner->remove_nodeweight(old_block, 1);
+					if (config.use_self_sorting_array) {
+						onepass_partitioner->decrement_sorted_block(old_block);
+					}
+				}
+			}
 #if defined MODE_PINSETLIST
 			graph_io_stream::readNodeOnePass_pinsl(config, curr_node, my_thread, input, onepass_partitioner);
 #elif defined MODE_NETLIST
@@ -169,6 +188,42 @@ int main(int argn, char **argv) {
 			delete input;
 			/* delete lines; */
 		}
+
+		// Evaluate this pass and track best partition
+		if (passes > 1) {
+			double pass_cut = 0, pass_con = 0;
+			EdgeWeight pass_qap = 0;
+			LongNodeID pass_pins = 0;
+			// Save stream_edges_assign before evaluation (evaluation modifies it)
+#if defined MODE_NETLIST
+			std::vector<PartitionID> saved_edges_assign(*config.stream_edges_assign);
+#endif
+#if defined MODE_PINSETLIST
+			graph_io_stream::streamEvaluateHPartition_pinsl(config, graph_filename, pass_cut, pass_con, pass_qap, pass_pins);
+#elif defined MODE_NETLIST
+			graph_io_stream::streamEvaluateHPartition_netl(config, graph_filename, pass_cut, pass_con, pass_qap, pass_pins);
+#endif
+			// Restore stream_edges_assign
+#if defined MODE_NETLIST
+			*config.stream_edges_assign = saved_edges_assign;
+#endif
+#if defined MODE_CONNECTIVITY
+			double pass_objective = pass_con;
+#else
+			double pass_objective = pass_cut;
+#endif
+			if (pass_objective < best_objective) {
+				best_objective = pass_objective;
+				best_nodes_assign = *config.stream_nodes_assign;
+				best_blocks_weight = *config.stream_blocks_weight;
+			}
+		}
+	}
+
+	// Restore best partition if restreaming was used
+	if (passes > 1 && !best_nodes_assign.empty()) {
+		*config.stream_nodes_assign = best_nodes_assign;
+		*config.stream_blocks_weight = best_blocks_weight;
 	}
 
 	// output some information about the partition that we have computed 
