@@ -98,7 +98,7 @@ inline void graph_io_stream::readNodeOnePass (PartitionConfig & config, LongNode
 	weight = (read_nw) ? line_numbers[col_counter++] : 1;
 	/* total_nodeweight += weight; */
 
-#ifdef MODE_STREAMMULTISECTION
+#if defined MODE_STREAMMULTISECTION || defined MODE_FREIGHT_GRAPHS
 	if (config.restream_number) {
 		NodeID node = 0;
 		LongNodeID lower_global_node = curr_node + 1; // Bounds below start from 1 instead of 0
@@ -106,6 +106,9 @@ inline void graph_io_stream::readNodeOnePass (PartitionConfig & config, LongNode
 		PartitionID nodeGlobalPar = (*config.stream_nodes_assign)[global_node];
 		(*config.stream_blocks_weight)[nodeGlobalPar] -= weight;
 		onepass_partitioner->remove_nodeweight(nodeGlobalPar, weight);
+		if (config.use_self_sorting_array) {
+			onepass_partitioner->decrement_sorted_block(nodeGlobalPar);
+		}
 	}
 #endif
 

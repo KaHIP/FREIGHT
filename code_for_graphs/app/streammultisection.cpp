@@ -101,7 +101,10 @@ int main(int argn, char **argv) {
 		graph_io_stream::readFirstLineStream(config, graph_filename, total_edge_cut, qap);
 		graph_io_stream::loadRemainingLinesToBinary(config, input);
 		buffer_io_time += io_t.elapsed();
-		onepass_partitioner->instantiate_blocks(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, config.imbalance); 		
+		onepass_partitioner->instantiate_blocks(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, config.imbalance);
+		if (config.restream_number > 0 && config.use_self_sorting_array) {
+			onepass_partitioner->reset_sorted_blocks();
+		}
 		if (config.stream_rec_bisection) {
 			onepass_partitioner->create_problem_tree(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, 
 					config.enable_mapping, config.stream_rec_biss_orig_alpha, config.non_hashified_layers);
@@ -176,7 +179,6 @@ int main(int argn, char **argv) {
 		}
 		graph_io_stream::streamEvaluatePartition(config, graph_filename, total_edge_cut, qap);
 		std::cout << "cut\t\t" << total_edge_cut << std::endl;
-		std::cout << "finalobjective  " << total_edge_cut << std::endl;
 		std::cout << "balance \t" << qm.balance_full_stream(*config.stream_blocks_weight) << std::endl;
 	}
 

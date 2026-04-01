@@ -399,6 +399,15 @@ inline void graph_io_stream::readFirstLineStream(PartitionConfig & partition_con
 #if defined MODE_NETLIST
 	if (partition_config.stream_edges_assign == NULL) {
 		partition_config.stream_edges_assign  = new std::vector<PartitionID>(partition_config.remaining_stream_edges, INVALID_PARTITION);
+	} else if (partition_config.restream_number > 0) {
+#if defined MODE_CONNECTIVITY
+		// Connectivity mode: keep carry-over (block of last-seen pin from previous pass)
+#else
+		// Cut-net mode: reset CUT_NET entries so previously-cut nets can be reconsidered
+		for (auto& entry : (*partition_config.stream_edges_assign)) {
+			if (entry == CUT_NET) entry = INVALID_PARTITION;
+		}
+#endif
 	}
 #endif
 	if (partition_config.stream_nodes_assign == NULL) {

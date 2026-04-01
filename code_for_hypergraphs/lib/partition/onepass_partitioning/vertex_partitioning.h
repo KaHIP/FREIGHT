@@ -47,6 +47,8 @@ class vertex_partitioning {
 		floating_block* get_block_address(PartitionID block_id);
 		const floating_block* get_block_address(PartitionID block_id) const;
 		void enable_self_sorting_array();
+		void reset_sorted_blocks();
+		void decrement_sorted_block(PartitionID block);
 		void set_sampling_threashold(float sampling_threashold);
                 
 		// Create hierarchy of subproblems
@@ -409,6 +411,25 @@ inline const floating_block* vertex_partitioning::get_block_address(PartitionID 
 
 inline void vertex_partitioning::enable_self_sorting_array() {
 	this->use_self_sorting_array = true;
+}
+
+inline void vertex_partitioning::reset_sorted_blocks() {
+	if (this->use_self_sorting_array) {
+		PartitionID k = blocks.size();
+		this->sorted_blocks.initialize(k, (NodeWeight)0);
+		// Rebuild from actual block weights so the ordering matches the current partition
+		for (PartitionID id = 0; id < k; id++) {
+			NodeWeight w = blocks[id].get_curr_weight();
+			for (NodeWeight j = 0; j < w; j++) {
+				this->sorted_blocks.increment(id);
+			}
+		}
+	}
+}
+
+inline void vertex_partitioning::decrement_sorted_block(PartitionID block) {
+#pragma omp critical(update_self_sorting_vector)
+	this->sorted_blocks.decrement(block);
 }
 
 inline void vertex_partitioning::set_sampling_threashold(float sampling_threashold) {
