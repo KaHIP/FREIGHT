@@ -240,7 +240,7 @@ inline std::vector<std::vector<LongNodeID>>* graph_io_stream::loadLinesFromStrea
 			pend = p + actual;
 		}
 
-		size_t avg_entries = (num_lines > 0) ? std::max((size_t)4, actual / (num_lines * 4)) : 4;
+		size_t avg_entries = (num_lines > 0) ? std::max((size_t)4, (size_t)(actual / (num_lines * 4))) : 4;
 
 		LongNodeID node_counter = 0;
 		while (node_counter < num_lines && p < pend) {

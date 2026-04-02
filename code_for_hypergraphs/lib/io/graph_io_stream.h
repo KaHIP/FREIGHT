@@ -393,7 +393,7 @@ inline std::vector<std::vector<LongNodeID>>* graph_io_stream::loadLinesFromStrea
 		}
 
 		// Estimate average entries per line for pre-reservation
-		size_t avg_entries = (num_lines > 0) ? std::max((size_t)4, actual / (num_lines * 4)) : 4;
+		size_t avg_entries = (num_lines > 0) ? std::max((size_t)4, (size_t)(actual / (num_lines * 4))) : 4;
 
 		// Parse integers directly from the buffer
 		LongNodeID node_counter = 0;
