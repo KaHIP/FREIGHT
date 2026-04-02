@@ -98,6 +98,7 @@ int main(int argn, char **argv) {
 
         config.LogDump(stdout);
 	config.stream_input = true;
+	config.graph_filename = graph_filename;
 
 	[[maybe_unused]] bool already_fully_partitioned;
 
@@ -113,8 +114,35 @@ int main(int argn, char **argv) {
 	for (config.restream_number=0; config.restream_number<passes; config.restream_number++) {
 
 		io_t.restart();
-		graph_io_stream::readFirstLineStream(config, graph_filename, total_edge_cut, qap);
-		graph_io_stream::loadRemainingLinesToBinary(config, input);
+		if (config.restream_number == 0 || !config.ram_stream) {
+			graph_io_stream::readFirstLineStream(config, graph_filename, total_edge_cut, qap);
+			graph_io_stream::loadRemainingLinesToBinary(config, input);
+		} else {
+			// Subsequent ram_stream passes: reset config without file I/O
+			config.remaining_stream_nodes = config.total_nodes;
+			config.remaining_stream_edges = config.total_edges;
+#if defined MODE_NETLIST
+#if !defined MODE_CONNECTIVITY
+			for (auto& entry : (*config.stream_edges_assign)) {
+				if (entry == CUT_NET) entry = INVALID_PARTITION;
+			}
+#endif
+#endif
+			config.total_stream_nodeweight = 0;
+			config.total_stream_nodecounter = 0;
+			config.stream_n_nodes = config.remaining_stream_nodes;
+			if (config.num_streams_passes > 1 + config.restream_number) {
+				config.stream_total_upperbound = ceil(((100+1.5*config.imbalance)/100.)*(config.remaining_stream_nodes/(double)config.k));
+			} else {
+				config.stream_total_upperbound = ceil(((100+config.imbalance)/100.)*(config.remaining_stream_nodes/(double)config.k));
+			}
+			config.quotient_nodes = config.k;
+			total_edge_cut = 0;
+			qap = 0;
+			config.nmbNodes = MIN(config.stream_buffer_len, config.remaining_stream_nodes);
+			config.n_batches = ceil(config.remaining_stream_nodes / (double)config.nmbNodes);
+			config.curr_batch = 0;
+		}
 		buffer_io_time += io_t.elapsed();
 		onepass_partitioner->instantiate_blocks(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, config.imbalance);
 		if (config.restream_number > 0 && config.use_self_sorting_array) {
@@ -128,12 +156,9 @@ int main(int argn, char **argv) {
 		omp_set_schedule(config.omp_schedule, config.omp_chunk);
 		omp_set_num_threads(config.parallel_nodes);
 
-#pragma omp parallel for schedule(static) 
 		for (int i=0; i < config.parallel_nodes; i++) {
 			config.all_blocks_to_keys[i].resize(config.k);
-			for (auto & b : config.all_blocks_to_keys[i]) {
-				b = INVALID_PARTITION;
-			}
+			memset(config.all_blocks_to_keys[i].data(), 0xFF, config.k * sizeof(PartitionID));
 			config.neighbor_blocks[i].resize(config.k);
 			config.next_key[i] = 0;
 			if (config.sample_edges) {
@@ -145,25 +170,38 @@ int main(int argn, char **argv) {
 			}
 		}
 
+		LongNodeID nodes_moved = 0;
+#if defined MODE_CONNECTIVITY && defined MODE_NETLIST
+		// First pass: maintain bitset inline for cheap connectivity computation
+		// Only safe for k <= 64 (single word per net) and unweighted edges
+		bool use_first_pass_bitset = (config.restream_number == 0 && passes > 1
+			&& config.ram_stream && config.k <= 64 && !config.read_ew);
+		size_t n_edges_for_bits = use_first_pass_bitset ? config.stream_edges_assign->size() : 0;
+		std::vector<uint64_t> first_pass_bits(n_edges_for_bits, 0);
+		double first_pass_connectivity = 0;
+#endif
 		processing_t.restart();
-#pragma omp parallel for schedule(runtime) 
+#pragma omp parallel for schedule(runtime)
 		for (LongNodeID curr_node = 0; curr_node < config.n_batches; curr_node++) {
 			int my_thread = omp_get_thread_num();
-			io_t.restart();
-			if((config.one_pass_algorithm != ONEPASS_HASHING) && (config.one_pass_algorithm != ONEPASS_HASHING_CRC32)) {
-				graph_io_stream::loadBufferLinesToBinary(config, input, 1);
+			if (!config.ram_stream) {
+				io_t.restart();
+				if((config.one_pass_algorithm != ONEPASS_HASHING) && (config.one_pass_algorithm != ONEPASS_HASHING_CRC32)) {
+					graph_io_stream::loadBufferLinesToBinary(config, input, 1);
+				}
+				buffer_io_time += io_t.elapsed();
 			}
-			buffer_io_time += io_t.elapsed();
 			// ***************************** perform partitioning ***************************************
-			t.restart();
+			if (config.dynamic_threashold) t.restart();
 			// Restreaming: remove vertex from its old block before re-evaluating
+			PartitionID old_block_for_move_check = INVALID_PARTITION;
 			if (config.restream_number > 0) {
-				PartitionID old_block = (*config.stream_nodes_assign)[curr_node];
-				if (old_block != INVALID_PARTITION) {
-					(*config.stream_blocks_weight)[old_block] -= 1;
-					onepass_partitioner->remove_nodeweight(old_block, 1);
+				old_block_for_move_check = (*config.stream_nodes_assign)[curr_node];
+				if (old_block_for_move_check != INVALID_PARTITION) {
+					(*config.stream_blocks_weight)[old_block_for_move_check] -= 1;
+					onepass_partitioner->remove_nodeweight(old_block_for_move_check, 1);
 					if (config.use_self_sorting_array) {
-						onepass_partitioner->decrement_sorted_block(old_block);
+						onepass_partitioner->decrement_sorted_block(old_block_for_move_check);
 					}
 				}
 			}
@@ -173,7 +211,15 @@ int main(int argn, char **argv) {
 			graph_io_stream::readNodeOnePass_netl(config, curr_node, my_thread, input, onepass_partitioner);
 #endif
 			PartitionID block = onepass_partitioner->solve_node(curr_node, 1, my_thread);
-			graph_io_stream::register_result(config, curr_node, block, my_thread);
+			if (config.ram_stream) {
+				graph_io_stream::register_result_from_input(config, curr_node, block, (*input)[curr_node]);
+			} else {
+				graph_io_stream::register_result(config, curr_node, block, my_thread);
+			}
+			if (config.restream_number > 0 && block != old_block_for_move_check) {
+#pragma omp atomic
+				nodes_moved++;
+			}
 #if defined MODE_NETLIST
 			if(config.dynamic_threashold) {
 				if (config.step_sampled) {
@@ -189,33 +235,85 @@ int main(int argn, char **argv) {
 				config.sampling_threashold = MIN(config.sampling_threashold, 4);
 			}
 #endif
-			global_mapping_time += t.elapsed();
 		}
 		total_time += processing_t.elapsed();
+		global_mapping_time += processing_t.elapsed();
 
-		if (config.ram_stream) {
-			delete input;
-			/* delete lines; */
+		if (!config.ram_stream) {
+			/* Non-ram_stream: input already freed per-node in readNodeOnePass */
 		}
 
+#if defined MODE_CONNECTIVITY && defined MODE_NETLIST
+		// First pass: compute connectivity from bitset (sequential, after parallel loop)
+		if (n_edges_for_bits > 0 && config.ram_stream) {
+			PartitionID* nodes_data = config.stream_nodes_assign->data();
+			for (LongNodeID node = 0; node < config.n_batches; node++) {
+				PartitionID block = nodes_data[node];
+				auto& ln = (*input)[node];
+				LongNodeID cc = config.read_nw ? 1 : 0;
+				LongNodeID ls = ln.size();
+				PartitionID sf = 1 + (PartitionID)config.read_ew;
+				while (cc < ls) {
+					size_t net_idx = ln[cc] - 1;
+					cc += sf;
+					uint64_t bit = 1ULL << (block % 64);
+					uint64_t old_word = first_pass_bits[net_idx];
+					if (!(old_word & bit)) {
+						if (old_word != 0) first_pass_connectivity += 1;
+						first_pass_bits[net_idx] = old_word | bit;
+					}
+				}
+			}
+		}
+#endif
+
 		// Evaluate this pass and track best partition
-		if (passes > 1) {
+		// Skip evaluation if no nodes moved (partition unchanged from previous pass)
+		if (passes > 1 && (config.restream_number == 0 || nodes_moved > 0)) {
 			double pass_cut = 0;
 			[[maybe_unused]] double pass_con = 0;
 			[[maybe_unused]] EdgeWeight pass_qap = 0;
 			[[maybe_unused]] LongNodeID pass_pins = 0;
-			// Save stream_edges_assign before evaluation (evaluation modifies it)
+
+			// First-pass shortcuts (only for unweighted, ram_stream)
+			bool used_shortcut = false;
 #if defined MODE_NETLIST
-			std::vector<PartitionID> saved_edges_assign(*config.stream_edges_assign);
+			if (config.restream_number == 0 && config.ram_stream && !config.read_ew) {
+#if defined MODE_CONNECTIVITY
+				if (use_first_pass_bitset) {
+					pass_con = first_pass_connectivity;
+					used_shortcut = true;
+				}
+#else
+				// Cut mode: count CUT_NET entries (accurate on first pass, no carry-over)
+				for (const auto& entry : *config.stream_edges_assign) {
+					if (entry == CUT_NET) pass_cut += 1;
+				}
+				pass_qap = pass_cut;
+				used_shortcut = true;
+#endif
+			}
+			if (!used_shortcut) {
+#endif
+			// For inter-pass evaluation, only compute the objective metric needed
+#if defined MODE_CONNECTIVITY
+			config.evaluate_cut = false;
+			config.evaluate_connectivity = true;
+#else
+			config.evaluate_cut = true;
+			config.evaluate_connectivity = false;
 #endif
 #if defined MODE_PINSETLIST
 			graph_io_stream::streamEvaluateHPartition_pinsl(config, graph_filename, pass_cut, pass_con, pass_qap, pass_pins);
 #elif defined MODE_NETLIST
-			graph_io_stream::streamEvaluateHPartition_netl(config, graph_filename, pass_cut, pass_con, pass_qap, pass_pins);
+			graph_io_stream::streamEvaluateHPartition_netl(config, graph_filename, pass_cut, pass_con, pass_qap, pass_pins,
+									config.ram_stream ? input : nullptr);
 #endif
-			// Restore stream_edges_assign
+			// Restore full evaluation flags
+			config.evaluate_cut = true;
+			config.evaluate_connectivity = true;
 #if defined MODE_NETLIST
-			*config.stream_edges_assign = saved_edges_assign;
+			}
 #endif
 #if defined MODE_CONNECTIVITY
 			double pass_objective = pass_con;
@@ -244,11 +342,20 @@ int main(int argn, char **argv) {
 	if(config.parallel_nodes < 2) {
 		std::cout << "time spent for integrated mapping: " << global_mapping_time  << std::endl;
 	}
+	// Always run full evaluation for final output (both cut and connectivity)
+	config.evaluate_cut = true;
+	config.evaluate_connectivity = true;
 #if defined MODE_PINSETLIST
 	graph_io_stream::streamEvaluateHPartition_pinsl(config, graph_filename, total_edge_cut, connectivity, qap, pin_count);
 #elif defined MODE_NETLIST
-	graph_io_stream::streamEvaluateHPartition_netl(config, graph_filename, total_edge_cut, connectivity, qap, pin_count);
+	graph_io_stream::streamEvaluateHPartition_netl(config, graph_filename, total_edge_cut, connectivity, qap, pin_count,
+								config.ram_stream ? input : nullptr, false);
 #endif
+	// Free cached input for ram_stream after all evaluations are done
+	if (config.ram_stream && input != NULL) {
+		delete input;
+		input = NULL;
+	}
 	std::cout << "nanoseconds / pin for integrated mapping: " << global_mapping_time*1000000000./pin_count  << std::endl;
 	std::cout << "pin count: \t"	<< pin_count << std::endl;
 	std::cout << "connectivity    " << connectivity << std::endl;

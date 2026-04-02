@@ -174,13 +174,22 @@ inline PartitionID vertex_partitioning::solve_node(LongNodeID curr_node_id, Node
 		switch(sampling) {
 			case SAMPLING_INACTIVE_LINEAR_COMPLEXITY:
 				decision = solve_linear_complexity(curr_node_id, curr_node_weight, my_thread);
+				// Duplicate call is intentional: #pragma omp critical cannot be conditionally skipped
+				if (n_threads > 1) {
 #pragma omp critical(update_self_sorting_vector)
-				this->sorted_blocks.increment(decision);
+					this->sorted_blocks.increment(decision);
+				} else {
+					this->sorted_blocks.increment(decision);
+				}
 				break;
 			case SAMPLING_NEIGHBORS_LINEAR_COMPLEXITY:
 				decision = solve_sampl_neighb_linear_complex(curr_node_id, curr_node_weight, my_thread);
+				if (n_threads > 1) {
 #pragma omp critical(update_self_sorting_vector)
-				this->sorted_blocks.increment(decision);
+					this->sorted_blocks.increment(decision);
+				} else {
+					this->sorted_blocks.increment(decision);
+				}
 				break;
 			case SAMPLING_INACTIVE:
 				decision = solve(curr_node_id, curr_node_weight, my_thread);
@@ -429,8 +438,12 @@ inline void vertex_partitioning::reset_sorted_blocks() {
 }
 
 inline void vertex_partitioning::decrement_sorted_block(PartitionID block) {
+	if (n_threads > 1) {
 #pragma omp critical(update_self_sorting_vector)
-	this->sorted_blocks.decrement(block);
+		this->sorted_blocks.decrement(block);
+	} else {
+		this->sorted_blocks.decrement(block);
+	}
 }
 
 inline void vertex_partitioning::set_sampling_threashold(float sampling_threashold) {

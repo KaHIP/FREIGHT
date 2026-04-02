@@ -88,6 +88,7 @@ int main(int argn, char **argv) {
 
         config.LogDump(stdout);
 	config.stream_input = true;
+	config.graph_filename = graph_filename;
 
 	[[maybe_unused]] bool already_fully_partitioned;
 
@@ -98,27 +99,45 @@ int main(int argn, char **argv) {
 	for (config.restream_number=0; config.restream_number<passes; config.restream_number++) {
 
 		io_t.restart();
-		graph_io_stream::readFirstLineStream(config, graph_filename, total_edge_cut, qap);
-		graph_io_stream::loadRemainingLinesToBinary(config, input);
+		if (config.restream_number == 0 || !config.ram_stream) {
+			// First pass or non-ram_stream: read file and load data
+			graph_io_stream::readFirstLineStream(config, graph_filename, total_edge_cut, qap);
+			graph_io_stream::loadRemainingLinesToBinary(config, input);
+		} else {
+			// Subsequent ram_stream passes: reset config without file I/O
+			config.remaining_stream_nodes = config.total_nodes;
+			config.remaining_stream_edges = config.total_edges;
+			config.total_stream_nodeweight = 0;
+			config.total_stream_nodecounter = 0;
+			config.stream_n_nodes = config.remaining_stream_nodes;
+			if (config.num_streams_passes > 1 + config.restream_number) {
+				config.stream_total_upperbound = ceil(((100+1.5*config.imbalance)/100.)*(config.remaining_stream_nodes/(double)config.k));
+			} else {
+				config.stream_total_upperbound = ceil(((100+config.imbalance)/100.)*(config.remaining_stream_nodes/(double)config.k));
+			}
+			config.quotient_nodes = config.k;
+			total_edge_cut = 0;
+			qap = 0;
+			config.nmbNodes = MIN(config.stream_buffer_len, config.remaining_stream_nodes);
+			config.n_batches = ceil(config.remaining_stream_nodes / (double)config.nmbNodes);
+			config.curr_batch = 0;
+		}
 		buffer_io_time += io_t.elapsed();
 		onepass_partitioner->instantiate_blocks(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, config.imbalance);
 		if (config.restream_number > 0 && config.use_self_sorting_array) {
 			onepass_partitioner->reset_sorted_blocks();
 		}
 		if (config.stream_rec_bisection) {
-			onepass_partitioner->create_problem_tree(config.remaining_stream_nodes, config.remaining_stream_edges, config.k, 
+			onepass_partitioner->create_problem_tree(config.remaining_stream_nodes, config.remaining_stream_edges, config.k,
 					config.enable_mapping, config.stream_rec_biss_orig_alpha, config.non_hashified_layers);
 		}
 
 		omp_set_schedule(config.omp_schedule, config.omp_chunk);
 		omp_set_num_threads(config.parallel_nodes);
 
-#pragma omp parallel for schedule(static) 
 		for (int i=0; i < config.parallel_nodes; i++) {
 			config.all_blocks_to_keys[i].resize(config.k);
-			for (auto & b : config.all_blocks_to_keys[i]) {
-				b = INVALID_PARTITION;
-			}
+			memset(config.all_blocks_to_keys[i].data(), 0xFF, config.k * sizeof(PartitionID));
 			config.neighbor_blocks[i].resize(config.k);
 			config.next_key[i] = 0;
 			if (config.sample_edges) {
@@ -131,16 +150,18 @@ int main(int argn, char **argv) {
 		}
 
 		processing_t.restart();
-#pragma omp parallel for schedule(runtime) 
+#pragma omp parallel for schedule(runtime)
 		for (LongNodeID curr_node = 0; curr_node < config.n_batches; curr_node++) {
 			int my_thread = omp_get_thread_num();
-			io_t.restart();
-			if((config.one_pass_algorithm != ONEPASS_HASHING) && (config.one_pass_algorithm != ONEPASS_HASHING_CRC32)) {
-				graph_io_stream::loadBufferLinesToBinary(config, input, 1);
+			if (!config.ram_stream) {
+				io_t.restart();
+				if((config.one_pass_algorithm != ONEPASS_HASHING) && (config.one_pass_algorithm != ONEPASS_HASHING_CRC32)) {
+					graph_io_stream::loadBufferLinesToBinary(config, input, 1);
+				}
+				buffer_io_time += io_t.elapsed();
 			}
-			buffer_io_time += io_t.elapsed();
-			// ***************************** perform partitioning ***************************************       
-			t.restart();
+			// ***************************** perform partitioning ***************************************
+			if (config.dynamic_threashold) t.restart();
 			graph_io_stream::readNodeOnePass(config, curr_node, my_thread, input, onepass_partitioner);
 			PartitionID block = onepass_partitioner->solve_node(curr_node, 1, my_thread);
 			(*config.stream_nodes_assign)[curr_node] = block;
@@ -158,14 +179,18 @@ int main(int argn, char **argv) {
 					config.sampling_threashold;
 				config.sampling_threashold = MIN(config.sampling_threashold, 4);
 			}
-			global_mapping_time += t.elapsed();
 		}
 		total_time += processing_t.elapsed();
+		global_mapping_time += processing_t.elapsed();
 
-		if (config.ram_stream) {
-			delete input;
-			/* delete lines; */
+		if (!config.ram_stream) {
+			/* Non-ram_stream: input already freed per-node */
 		}
+	}
+
+	// Free cached input for ram_stream after all passes
+	if (config.ram_stream && input != NULL) {
+		delete input;
 	}
 
 	// output some information about the partition that we have computed 

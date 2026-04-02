@@ -6,6 +6,7 @@
  *****************************************************************************/
 
 #include <math.h>
+#include <cstring>
 #include <sstream>
 #include "graph_io_stream.h"
 #include "timer.h"
@@ -134,42 +135,49 @@ void graph_io_stream::streamEvaluateHPartition_pinsl(PartitionConfig & config, c
 	delete lines;
 }
 
-void graph_io_stream::streamEvaluateHPartition_netl(PartitionConfig & config, const std::string & filename, double& cutNet, double& connectivity, 
-						EdgeWeight& qap, LongNodeID& pin_count) {
-	std::vector<std::vector<LongNodeID>>* input;
-	std::vector<std::string>* lines;
-	lines = new std::vector<std::string>(1);
-	LongNodeID node_counter = 0;
+void graph_io_stream::streamEvaluateHPartition_netl(PartitionConfig & config, const std::string & filename, double& cutNet, double& connectivity,
+						EdgeWeight& qap, LongNodeID& pin_count,
+						std::vector<std::vector<LongNodeID>>* cached_input,
+						bool use_local_scratch) {
+	bool use_cached = (cached_input != nullptr);
+	std::vector<std::vector<LongNodeID>>* input = nullptr;
+	std::vector<std::string>* lines = nullptr;
 	buffered_input *ss2 = NULL;
-        std::string line;
-        std::ifstream in(filename.c_str());
-        if (!in) {
-                std::cerr << "Error opening " << filename << std::endl;
-                return;
-        }
-        long nmbNodes;
-        long nmbEdges;
-        int ew = 0;
-	std::getline(in,(*lines)[0]);
-	while ((*lines)[0][0] == '%') std::getline(in,(*lines)[0]); // a comment in the file
-
-        std::stringstream ss((*lines)[0]);
-        ss >> nmbNodes;
-        ss >> nmbEdges;
-        ss >> ew;
+	std::ifstream in;
         bool read_ew = false;
         bool read_nw = false;
-        if(ew == 1) {
-                read_ew = true;
-        } else if (ew == 11) {
-                read_ew = true;
-                read_nw = true;
-        } else if (ew == 10) {
-                read_nw = true;
-        }
-	[[maybe_unused]] NodeID target;
-        [[maybe_unused]] NodeWeight total_nodeweight = 0;
-        [[maybe_unused]] EdgeWeight total_edgeweight = 0;
+	long nmbNodes = 0;
+
+	if (use_cached) {
+		nmbNodes = cached_input->size();
+		read_ew = config.read_ew;
+		read_nw = config.read_nw;
+	} else {
+		lines = new std::vector<std::string>(1);
+		in.open(filename.c_str());
+		if (!in) {
+			std::cerr << "Error opening " << filename << std::endl;
+			return;
+		}
+		int ew = 0;
+		std::getline(in,(*lines)[0]);
+		while ((*lines)[0][0] == '%') std::getline(in,(*lines)[0]);
+		std::stringstream ss((*lines)[0]);
+		ss >> nmbNodes;
+		long nmbEdges;
+		ss >> nmbEdges;
+		ss >> ew;
+		if(ew == 1) {
+			read_ew = true;
+		} else if (ew == 11) {
+			read_ew = true;
+			read_nw = true;
+		} else if (ew == 10) {
+			read_nw = true;
+		}
+	}
+
+	[[maybe_unused]] NodeWeight total_nodeweight = 0;
 	cutNet = 0;
 	connectivity = 0;
 	qap = 0;
@@ -184,22 +192,58 @@ void graph_io_stream::streamEvaluateHPartition_netl(PartitionConfig & config, co
 		D->setPartitionConfig(config);
 	}
 
-	// erase nets for evaluation only
-	for (auto& net : (*config.stream_edges_assign) ) {
-		net = INVALID_PARTITION;
-	}
-	std::vector<bool> net_seen(config.stream_edges_assign->size(), false);
+	size_t n_edges = config.stream_edges_assign->size();
 	pin_count = 0;
-	std::vector<std::unordered_set<PartitionID>> touched_nets_per_block(config.k);
-        while(  std::getline(in, (*lines)[0])) {
-		if ((*lines)[0][0] == '%') continue; // a comment in the file
-                NodeID node = node_counter++;
-		PartitionID node_block = (*config.stream_nodes_assign)[node];
 
-		input = new std::vector<std::vector<LongNodeID>>(1);
-		ss2 = new buffered_input(lines);
-		ss2->simple_scan_line((*input)[0]);
-		std::vector<LongNodeID> &line_numbers = (*input)[0];
+	// Use runtime flag to determine which metrics to compute
+	// (compile-time #ifdefs don't work here because this .cpp is compiled once for both modes)
+	bool compute_cut = config.evaluate_cut;
+	bool compute_connectivity = config.evaluate_connectivity;
+
+	// For cut tracking: use local scratch (inter-pass) or stream_edges_assign directly (final)
+	std::vector<PartitionID> eval_edges;
+	PartitionID* edges_data = nullptr;
+	if (compute_cut) {
+		if (use_local_scratch) {
+			eval_edges.assign(n_edges, INVALID_PARTITION);
+			edges_data = eval_edges.data();
+		} else {
+			std::memset(config.stream_edges_assign->data(), 0xFF, n_edges * sizeof(PartitionID));
+			edges_data = config.stream_edges_assign->data();
+		}
+	}
+	size_t words_per_net = ((size_t)config.k + 63) / 64;
+	std::vector<uint64_t> net_block_bits;
+	if (compute_connectivity) {
+		// Guard against excessive memory usage for large k * n_edges
+		size_t total_words = n_edges * words_per_net;
+		const size_t MAX_BITSET_WORDS = (size_t(256) * 1024 * 1024) / sizeof(uint64_t); // 256 MiB cap
+		if (words_per_net != 0 && n_edges <= MAX_BITSET_WORDS / words_per_net) {
+			net_block_bits.assign(total_words, 0);
+		} else {
+			compute_connectivity = false; // too large, skip connectivity computation
+		}
+	}
+
+	PartitionID* nodes_assign_data = config.stream_nodes_assign->data();
+	uint64_t* bits_data = compute_connectivity ? net_block_bits.data() : nullptr;
+
+	for (long node = 0; node < nmbNodes; node++) {
+		std::vector<LongNodeID>* line_numbers_ptr;
+		if (use_cached) {
+			line_numbers_ptr = &(*cached_input)[node];
+		} else {
+			if (!std::getline(in, (*lines)[0])) break;
+			if ((*lines)[0][0] == '%') { node--; continue; }
+			input = new std::vector<std::vector<LongNodeID>>(1);
+			ss2 = new buffered_input(lines);
+			ss2->simple_scan_line((*input)[0]);
+			line_numbers_ptr = &(*input)[0];
+		}
+
+		std::vector<LongNodeID> &line_numbers = *line_numbers_ptr;
+		LongNodeID line_size = line_numbers.size();
+		PartitionID node_block = nodes_assign_data[node];
 		LongNodeID col_counter = 0;
 
                 NodeWeight weight = 1;
@@ -207,44 +251,67 @@ void graph_io_stream::streamEvaluateHPartition_netl(PartitionConfig & config, co
 			weight = line_numbers[col_counter++];
                         total_nodeweight += weight;
                 }
-		while (col_counter < line_numbers.size()) {
+		while (col_counter < line_size) {
 			LongEdgeID net = line_numbers[col_counter++];
 			pin_count++;
-			PartitionID old_net_block = (*config.stream_edges_assign)[net-1];
-			PartitionID new_net_block = (old_net_block==node_block || old_net_block==INVALID_PARTITION) ? node_block : CUT_NET;
-			(*config.stream_edges_assign)[net-1] = (old_net_block==COMPUTED_CUT_NET) ? COMPUTED_CUT_NET : new_net_block;
                         EdgeWeight edge_weight = 1;
                         if( read_ew ) {
 				edge_weight = line_numbers[col_counter++];
                         }
-			if (new_net_block == CUT_NET && old_net_block != CUT_NET && old_net_block != COMPUTED_CUT_NET) {
-				cutNet += edge_weight;
-				(*config.stream_edges_assign)[net-1] = COMPUTED_CUT_NET;
-				if (config.enable_mapping) {
-					EdgeWeight comm_vol      = edge_weight;
-					NodeID perm_rank_node    = (*perm_rank)[node_block];
-					NodeID perm_rank_target  = (*perm_rank)[old_net_block];
-					EdgeWeight cur_vol       = comm_vol*(D->get_xy(perm_rank_node, perm_rank_target));
-					qap			+= cur_vol; 
+			if (compute_cut) {
+				// Cut tracking via eval_edges
+				if (col_counter < line_size) {
+					__builtin_prefetch(&edges_data[line_numbers[col_counter]-1], 1, 1);
+				}
+				PartitionID old_net_block = edges_data[net-1];
+				PartitionID new_net_block = (old_net_block==node_block || old_net_block==INVALID_PARTITION) ? node_block : CUT_NET;
+				edges_data[net-1] = (old_net_block==COMPUTED_CUT_NET) ? COMPUTED_CUT_NET : new_net_block;
+				if (new_net_block == CUT_NET && old_net_block != CUT_NET && old_net_block != COMPUTED_CUT_NET) {
+					cutNet += edge_weight;
+					edges_data[net-1] = COMPUTED_CUT_NET;
+					if (config.enable_mapping) {
+						EdgeWeight comm_vol      = edge_weight;
+						NodeID perm_rank_node    = (*perm_rank)[node_block];
+						NodeID perm_rank_target  = (*perm_rank)[old_net_block];
+						EdgeWeight cur_vol       = comm_vol*(D->get_xy(perm_rank_node, perm_rank_target));
+						qap			+= cur_vol;
+					}
 				}
 			}
-			if (touched_nets_per_block[node_block].find(net) == touched_nets_per_block[node_block].end()) {
-				connectivity += edge_weight;
-				touched_nets_per_block[node_block].insert(net);
-			}
-			if (!net_seen[net]) {
-				net_seen[net] = true;
-				connectivity -= edge_weight; // subtract net weight once per net to compute connectivity correctly
+			if (compute_connectivity) {
+				// Connectivity tracking via bitset
+				size_t net_idx = net - 1;
+				uint64_t bit_mask = 1ULL << (node_block % 64);
+				if (words_per_net == 1) {
+					// Fast path for k <= 64: single word per net
+					uint64_t old_word = bits_data[net_idx];
+					if (!(old_word & bit_mask)) {
+						if (old_word != 0) connectivity += edge_weight;
+						bits_data[net_idx] = old_word | bit_mask;
+					}
+				} else {
+					size_t base = net_idx * words_per_net;
+					size_t word_offset = node_block / 64;
+					if (!(bits_data[base + word_offset] & bit_mask)) {
+						bool first_touch = true;
+						for (size_t w = 0; w < words_per_net; w++) {
+							if (bits_data[base + w] != 0) { first_touch = false; break; }
+						}
+						if (!first_touch) {
+							connectivity += edge_weight;
+						}
+						bits_data[base + word_offset] |= bit_mask;
+					}
+				}
 			}
                 }
-		(*lines)[0].clear(); delete ss2;
-		delete input;
-                if(in.eof()) {
-                        break;
-                }
+		if (!use_cached) {
+			(*lines)[0].clear(); delete ss2;
+			delete input;
+		}
         }
 	if (!config.enable_mapping) qap = cutNet;
-	delete lines;
+	if (lines) delete lines;
 }
 
 void graph_io_stream::streamEvaluateEdgePartition_netl(PartitionConfig & config, const std::string & filename, double& cutNet, double& connectivity, 
