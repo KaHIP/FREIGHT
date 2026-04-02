@@ -24,6 +24,23 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+# Profile-Guided Optimization (PGO) support
+option(PGO_GENERATE "Build with PGO instrumentation (phase 1)" OFF)
+option(PGO_USE "Build with PGO optimization from collected profiles (phase 2)" OFF)
+if(PGO_GENERATE AND PGO_USE)
+  message(FATAL_ERROR "PGO_GENERATE and PGO_USE are mutually exclusive. Use PGO_GENERATE first, run a training workload, then rebuild with PGO_USE.")
+endif()
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  if(PGO_GENERATE)
+    add_definitions(-fprofile-generate=${CMAKE_BINARY_DIR}/pgo_data)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-generate=${CMAKE_BINARY_DIR}/pgo_data")
+  endif()
+  if(PGO_USE)
+    add_definitions(-fprofile-use=${CMAKE_BINARY_DIR}/pgo_data -fprofile-correction)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-use=${CMAKE_BINARY_DIR}/pgo_data")
+  endif()
+endif()
+
 # tweak compiler flags
 CHECK_CXX_COMPILER_FLAG(-funroll-loops COMPILER_SUPPORTS_FUNROLL_LOOPS)
 if(COMPILER_SUPPORTS_FUNROLL_LOOPS)
@@ -90,7 +107,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/tools)
 
 
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc")
+# Removed -fno-builtin-malloc flags to let compiler optimize allocation patterns
 
 set(LIBKAFFPA_SOURCE_FILES
   lib/tools/quality_metrics.cpp

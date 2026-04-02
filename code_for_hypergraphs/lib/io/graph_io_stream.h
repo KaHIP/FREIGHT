@@ -20,6 +20,10 @@
 #include <unordered_map>
 #include <list>
 #include <algorithm>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "definitions.h"
 #include "data_structure/hypergraph.h"
@@ -69,8 +73,10 @@ class graph_io_stream {
 					EdgeWeight& qap, LongNodeID& pin_count);
 
                 static
-		void streamEvaluateHPartition_netl(PartitionConfig & config, const std::string & filename, double& cutNet, double& connectivity, 
-					EdgeWeight& qap, LongNodeID& pin_count);
+		void streamEvaluateHPartition_netl(PartitionConfig & config, const std::string & filename, double& cutNet, double& connectivity,
+					EdgeWeight& qap, LongNodeID& pin_count,
+					std::vector<std::vector<LongNodeID>>* cached_input = nullptr,
+					bool use_local_scratch = true);
 
 		static
 		void streamEvaluateEdgePartition_netl(PartitionConfig & config, const std::string & filename, double& cutNet, double& connectivity, 
@@ -117,6 +123,10 @@ class graph_io_stream {
 
                 static
 		void register_result(PartitionConfig & config, LongNodeID curr_node, PartitionID assigned_block, int my_thread);
+
+		static
+		void register_result_from_input(PartitionConfig & config, LongNodeID curr_node, PartitionID assigned_block,
+						std::vector<LongNodeID> &line_numbers);
 
                 static
 		void readPartition(PartitionConfig & config, const std::string & filename);
@@ -208,7 +218,9 @@ inline void graph_io_stream::readNodeOnePass_pinsl (PartitionConfig & config, Lo
         /* config.total_stream_nodecounter += nmbNodes; */
         /* config.total_stream_nodeweight  += total_nodeweight; */
         /* config.remaining_stream_nodes   -= nmbNodes; */
-        config.remaining_stream_nodes--;
+        // For ram_stream, remaining_stream_nodes is unused during the loop (reset each pass
+        // by readFirstLineStream) so skip the decrement. Non-ram_stream needs it for streaming I/O.
+        if (!config.ram_stream) config.remaining_stream_nodes--;
 }
 
 inline void graph_io_stream::readNodeOnePass_netl (PartitionConfig & config, LongNodeID curr_node, int my_thread, 
@@ -230,9 +242,12 @@ inline void graph_io_stream::readNodeOnePass_netl (PartitionConfig & config, Lon
 	auto& next_key = config.next_key[my_thread];
 	auto& neighbor_blocks = config.neighbor_blocks[my_thread];
 	auto& sampled_edges = config.sampled_edges[my_thread];
-	auto& valid_neighboring_nets = config.valid_neighboring_nets[my_thread];
 
-	valid_neighboring_nets.clear();
+	// For ram_stream, register_result_from_input reads nets directly from cached data,
+	// so we skip building valid_neighboring_nets
+	if (!config.ram_stream) {
+		config.valid_neighboring_nets[my_thread].clear();
+	}
 	onepass_partitioner->clear_edgeweight_blocks(neighbor_blocks, next_key, my_thread);
 	next_key = 0;
 
@@ -242,9 +257,11 @@ inline void graph_io_stream::readNodeOnePass_netl (PartitionConfig & config, Lon
 	/* total_nodeweight += weight; */
 
 
+	float scaling_factor = 1;
 	PartitionID selecting_factor = (1+(PartitionID)read_ew);
-	config.edges = (line_numbers.size()-col_counter) / selecting_factor;
-	float scaling_factor = 1; 
+	if(config.sample_edges || config.dynamic_threashold) {
+		config.edges = (line_numbers.size()-col_counter) / selecting_factor;
+	}
 	if(config.sample_edges) {
 		EdgeID n_sampled_edges = (config.sampling_threashold*config.stream_sampling < config.edges) ? config.stream_sampling : config.edges;
 		bool sampling_active = n_sampled_edges < config.edges;
@@ -257,7 +274,7 @@ inline void graph_io_stream::readNodeOnePass_netl (PartitionConfig & config, Lon
 
 			sampled_edges[i].first  = (*config.stream_edges_assign)[net-1];
 			sampled_edges[i].second = (read_ew) ? line_numbers[edge_pos+1] : 1;
-			if(sampled_edges[i].first != CUT_NET) valid_neighboring_nets.push_back(net-1);
+			if(sampled_edges[i].first != CUT_NET && !config.ram_stream) config.valid_neighboring_nets[my_thread].push_back(net-1);
 		}
 		for (PartitionID i=0; i<n_sampled_edges; i++) {
 			const auto& [targetGlobalPar,edge_weight] = sampled_edges[i];
@@ -272,12 +289,18 @@ inline void graph_io_stream::readNodeOnePass_netl (PartitionConfig & config, Lon
 			}
 		}
 	} else {
-		while (col_counter < line_numbers.size()) {
+		PartitionID* edges_assign_data = config.stream_edges_assign->data();
+		LongNodeID line_size = line_numbers.size();
+		while (col_counter < line_size) {
 			net = line_numbers[col_counter++];
 			EdgeWeight edge_weight = (read_ew) ? line_numbers[col_counter++] : 1;
 
-			PartitionID targetGlobalPar = (*config.stream_edges_assign)[net-1];
-			if(targetGlobalPar != CUT_NET) valid_neighboring_nets.push_back(net-1);
+			// Prefetch the next net's assignment to hide memory latency
+			if (col_counter < line_size) {
+				__builtin_prefetch(&edges_assign_data[line_numbers[col_counter]-1], 0, 1);
+			}
+			PartitionID targetGlobalPar = edges_assign_data[net-1];
+			if(!config.ram_stream && targetGlobalPar != CUT_NET) config.valid_neighboring_nets[my_thread].push_back(net-1);
 			if(targetGlobalPar != INVALID_PARTITION && targetGlobalPar != CUT_NET) {
 				PartitionID key = all_blocks_to_keys[targetGlobalPar];
 				if (key >= next_key || neighbor_blocks[key].first != targetGlobalPar) {
@@ -305,7 +328,6 @@ inline void graph_io_stream::readNodeOnePass_netl (PartitionConfig & config, Lon
         /* config.total_stream_nodecounter += nmbNodes; */
         /* config.total_stream_nodeweight  += total_nodeweight; */
         /* config.remaining_stream_nodes   -= nmbNodes; */
-	config.remaining_stream_nodes--;
 }
 
 inline void graph_io_stream::loadRemainingLinesToBinary(PartitionConfig & partition_config, std::vector<std::vector<LongNodeID>>* &input) {
@@ -323,20 +345,104 @@ inline void graph_io_stream::loadBufferLinesToBinary(PartitionConfig & partition
 inline std::vector<std::vector<LongNodeID>>* graph_io_stream::loadLinesFromStreamToBinary(PartitionConfig & partition_config, LongNodeID num_lines) {
 	std::vector<std::vector<LongNodeID>>* input;
 	input = new std::vector<std::vector<LongNodeID>>(num_lines);
-	std::vector<std::string>* lines;
-	lines = new std::vector<std::string>(1);
-	LongNodeID node_counter = 0;
-	buffered_input *ss2 = NULL;
-	while( node_counter < num_lines) {
-		std::getline(*(partition_config.stream_in),(*lines)[0]);
-		if ((*lines)[0][0] == '%') { // a comment in the file
-			continue;
+
+	if (partition_config.ram_stream) {
+		// Get current stream position (after header)
+		std::ifstream& in = *(partition_config.stream_in);
+		std::streampos cur = in.tellg();
+
+		// mmap the entire file for zero-copy access (POSIX: Linux + macOS)
+		int fd = open(partition_config.graph_filename.c_str(), O_RDONLY);
+		void* mmap_addr = MAP_FAILED;
+		size_t file_size = 0;
+		size_t offset = 0;
+		if (fd != -1) {
+			struct stat st;
+			if (fstat(fd, &st) == 0 && st.st_size > 0 && cur >= 0) {
+				file_size = (size_t)st.st_size;
+				offset = (size_t)cur;
+				if (offset <= file_size) {
+#ifdef MAP_POPULATE
+					mmap_addr = mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
+#else
+					mmap_addr = mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
+#endif
+				}
+			}
+			close(fd);
 		}
-		ss2 = new buffered_input(lines);
-		ss2->simple_scan_line((*input)[node_counter++]);
-		(*lines)[0].clear(); delete ss2;
+
+		const char* p;
+		const char* pend;
+		size_t actual;
+		std::vector<char> buf; // fallback only
+		if (mmap_addr != MAP_FAILED) {
+			p = (const char*)mmap_addr + offset;
+			pend = (const char*)mmap_addr + file_size;
+			actual = file_size - offset;
+		} else {
+			// Fallback to ifstream::read
+			in.seekg(0, std::ios::end);
+			size_t remaining = (size_t)in.tellg() - offset;
+			in.seekg(cur);
+			buf.resize(remaining);
+			in.read(buf.data(), remaining);
+			actual = (size_t)in.gcount();
+			p = buf.data();
+			pend = p + actual;
+		}
+
+		// Estimate average entries per line for pre-reservation
+		size_t avg_entries = (num_lines > 0) ? std::max((size_t)4, actual / (num_lines * 4)) : 4;
+
+		// Parse integers directly from the buffer
+		LongNodeID node_counter = 0;
+		while (node_counter < num_lines && p < pend) {
+			// Skip comment lines
+			if (*p == '%') {
+				while (p < pend && *p != '\n') p++;
+				if (p < pend) p++;
+				continue;
+			}
+			auto& vec = (*input)[node_counter];
+			vec.reserve(avg_entries);
+			while (p < pend && *p != '\n' && *p != '\r') {
+				// Skip non-digit
+				while (p < pend && *p != '\n' && *p != '\r' && (*p < '0' || *p > '9')) p++;
+				if (p >= pend || *p == '\n' || *p == '\r') break;
+				// Parse integer
+				LongNodeID val = 0;
+				while (p < pend && *p >= '0' && *p <= '9') {
+					val = val * 10 + (LongNodeID)(*p - '0');
+					p++;
+				}
+				vec.push_back(val);
+			}
+			// Skip line ending
+			if (p < pend && *p == '\r') p++;
+			if (p < pend && *p == '\n') p++;
+			node_counter++;
+		}
+		if (mmap_addr != MAP_FAILED) {
+			munmap(mmap_addr, file_size);
+		}
+	} else {
+		// Original streaming approach
+		std::vector<std::string>* lines;
+		lines = new std::vector<std::string>(1);
+		LongNodeID node_counter = 0;
+		buffered_input *ss2 = NULL;
+		while( node_counter < num_lines) {
+			std::getline(*(partition_config.stream_in),(*lines)[0]);
+			if ((*lines)[0][0] == '%') {
+				continue;
+			}
+			ss2 = new buffered_input(lines);
+			ss2->simple_scan_line((*input)[node_counter++]);
+			(*lines)[0].clear(); delete ss2;
+		}
+		delete lines;
 	}
-	delete lines;
 	return input;
 }
 
@@ -346,6 +452,29 @@ inline void graph_io_stream::register_result(PartitionConfig & config, LongNodeI
 #if defined MODE_NETLIST
 	for (auto& neighboring_net : config.valid_neighboring_nets[my_thread]) {
 		PartitionID & old_block = (*config.stream_edges_assign)[neighboring_net];
+#if defined MODE_CONNECTIVITY
+		old_block = assigned_block;
+#else
+		old_block = (old_block==assigned_block || old_block==INVALID_PARTITION) ? assigned_block : CUT_NET;
+#endif
+	}
+#endif
+}
+
+inline void graph_io_stream::register_result_from_input(PartitionConfig & config, LongNodeID curr_node, PartitionID assigned_block,
+							std::vector<LongNodeID> &line_numbers) {
+	(*config.stream_nodes_assign)[curr_node] = assigned_block;
+	(*config.stream_blocks_weight)[assigned_block] += 1;
+#if defined MODE_NETLIST
+	PartitionID* edges_data = config.stream_edges_assign->data();
+	LongNodeID col_counter = config.read_nw ? 1 : 0;
+	LongNodeID line_size = line_numbers.size();
+	PartitionID selecting_factor = 1 + (PartitionID)config.read_ew;
+	while (col_counter < line_size) {
+		LongEdgeID net = line_numbers[col_counter];
+		col_counter += selecting_factor;
+		PartitionID & old_block = edges_data[net-1];
+		if (old_block == CUT_NET) continue;
 #if defined MODE_CONNECTIVITY
 		old_block = assigned_block;
 #else

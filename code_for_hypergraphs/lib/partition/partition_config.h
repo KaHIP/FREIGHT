@@ -399,6 +399,8 @@ struct PartitionConfig
         int max_recursion_levels_construction; 
 
         bool enable_mapping;
+        bool evaluate_cut = true;
+        bool evaluate_connectivity = true;
 
 
         //=======================================

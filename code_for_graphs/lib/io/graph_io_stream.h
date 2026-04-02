@@ -19,6 +19,10 @@
 #include <unordered_map>
 #include <list>
 #include <algorithm>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "definitions.h"
 #include "data_structure/graph_access.h"
@@ -191,20 +195,96 @@ inline void graph_io_stream::loadBufferLinesToBinary(PartitionConfig & partition
 inline std::vector<std::vector<LongNodeID>>* graph_io_stream::loadLinesFromStreamToBinary(PartitionConfig & partition_config, LongNodeID num_lines) {
 	std::vector<std::vector<LongNodeID>>* input;
 	input = new std::vector<std::vector<LongNodeID>>(num_lines);
-	std::vector<std::string>* lines;
-	lines = new std::vector<std::string>(1);
-	LongNodeID node_counter = 0;
-	buffered_input *ss2 = NULL;
-	while( node_counter < num_lines) {
-		std::getline(*(partition_config.stream_in),(*lines)[0]);
-		if ((*lines)[0][0] == '%') { // a comment in the file
-			continue;
+
+	if (partition_config.ram_stream) {
+		// mmap the file for zero-copy access, then parse from the mapped region
+		std::ifstream& in = *(partition_config.stream_in);
+		std::streampos cur = in.tellg();
+
+		int fd = open(partition_config.graph_filename.c_str(), O_RDONLY);
+		void* mmap_addr = MAP_FAILED;
+		size_t file_size = 0;
+		size_t offset = 0;
+		if (fd != -1) {
+			struct stat st;
+			if (fstat(fd, &st) == 0 && st.st_size > 0 && cur >= 0) {
+				file_size = (size_t)st.st_size;
+				offset = (size_t)cur;
+				if (offset <= file_size) {
+#ifdef MAP_POPULATE
+					mmap_addr = mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
+#else
+					mmap_addr = mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
+#endif
+				}
+			}
+			close(fd);
 		}
-		ss2 = new buffered_input(lines);
-		ss2->simple_scan_line((*input)[node_counter++]);
-		(*lines)[0].clear(); delete ss2;
+
+		const char* p;
+		const char* pend;
+		size_t actual;
+		std::vector<char> buf; // fallback only
+		if (mmap_addr != MAP_FAILED) {
+			p = (const char*)mmap_addr + offset;
+			pend = (const char*)mmap_addr + file_size;
+			actual = file_size - offset;
+		} else {
+			in.seekg(0, std::ios::end);
+			size_t remaining = (size_t)in.tellg() - offset;
+			in.seekg(cur);
+			buf.resize(remaining);
+			in.read(buf.data(), remaining);
+			actual = (size_t)in.gcount();
+			p = buf.data();
+			pend = p + actual;
+		}
+
+		size_t avg_entries = (num_lines > 0) ? std::max((size_t)4, actual / (num_lines * 4)) : 4;
+
+		LongNodeID node_counter = 0;
+		while (node_counter < num_lines && p < pend) {
+			if (*p == '%') {
+				while (p < pend && *p != '\n') p++;
+				if (p < pend) p++;
+				continue;
+			}
+			auto& vec = (*input)[node_counter];
+			vec.reserve(avg_entries);
+			while (p < pend && *p != '\n' && *p != '\r') {
+				while (p < pend && *p != '\n' && *p != '\r' && (*p < '0' || *p > '9')) p++;
+				if (p >= pend || *p == '\n' || *p == '\r') break;
+				LongNodeID val = 0;
+				while (p < pend && *p >= '0' && *p <= '9') {
+					val = val * 10 + (LongNodeID)(*p - '0');
+					p++;
+				}
+				vec.push_back(val);
+			}
+			if (p < pend && *p == '\r') p++;
+			if (p < pend && *p == '\n') p++;
+			node_counter++;
+		}
+		if (mmap_addr != MAP_FAILED) {
+			munmap(mmap_addr, file_size);
+		}
+	} else {
+		// Original streaming approach
+		std::vector<std::string>* lines;
+		lines = new std::vector<std::string>(1);
+		LongNodeID node_counter = 0;
+		buffered_input *ss2 = NULL;
+		while( node_counter < num_lines) {
+			std::getline(*(partition_config.stream_in),(*lines)[0]);
+			if ((*lines)[0][0] == '%') {
+				continue;
+			}
+			ss2 = new buffered_input(lines);
+			ss2->simple_scan_line((*input)[node_counter++]);
+			(*lines)[0].clear(); delete ss2;
+		}
+		delete lines;
 	}
-	delete lines;
 	return input;
 }
 

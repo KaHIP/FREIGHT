@@ -616,6 +616,8 @@ inline void configuration::standard( PartitionConfig & partition_config ) {
         partition_config.problem		           = PROBLEM_DEGREE;
 
         partition_config.enable_mapping                    = false;
+        partition_config.evaluate_cut                      = true;
+        partition_config.evaluate_connectivity             = true;
         partition_config.ls_neighborhood                   = COMMUNICATIONGRAPH;
         partition_config.communication_neighborhood_dist   = 10;
         partition_config.construction_algorithm            = MAP_CONST_FASTHIERARCHY_TOPDOWN;
