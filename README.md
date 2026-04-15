@@ -19,6 +19,8 @@ FREIGHT v1.0.3
 
 **FREIGHT** (Fast stREamInG Hypergraph parTitioning) is a streaming algorithm for hypergraph partitioning based on the Fennel algorithm. Part of the [KaHIP](https://github.com/KaHIP) organization.
 
+> **Python Interface:** An easy-to-use Python interface for this software is available in [CHSZLabLib](https://github.com/CHSZLab/CHSZLabLib).
+
 | | |
 |:--|:--|
 | **What it solves** | Partition hypergraphs and graphs too large to fit in memory, or when you need fast partitioning |
